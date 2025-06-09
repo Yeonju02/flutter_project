@@ -22,7 +22,7 @@ class CustomBlueButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.lightBlue[300],
+          backgroundColor: const Color(0xFF92BBE2),
         minimumSize: Size(double.infinity, 48),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(30),
