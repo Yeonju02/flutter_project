@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../custom/custom_blue_button.dart';
 import '../main/main_page.dart';
 import 'signup_page.dart';
@@ -27,7 +28,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<void> _handleLogin() async {  // 검증, 로그인
+  Future<void> _handleLogin() async {
     String userId = userIdController.text.trim();
     String password = passwordController.text.trim();
 
@@ -37,31 +38,33 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     try {
-      final snapshot = await FirebaseFirestore.instance
+      // userId로 userEmail 찾기
+      final query = await FirebaseFirestore.instance
           .collection('users')
           .where('userId', isEqualTo: userId)
           .limit(1)
           .get();
 
-      if (snapshot.docs.isEmpty) {
+      if (query.docs.isEmpty) {
         _showToast("존재하지 않는 아이디입니다.");
         return;
       }
 
-      final userData = snapshot.docs.first.data();
-      if (userData['password'] != password) {
-        _showToast("비밀번호가 일치하지 않습니다.");
-        return;
-      }
+      final userEmail = query.docs.first['userEmail'];
+
+      // 이메일 로그인
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: userEmail,
+        password: password,
+      );
 
       _showToast("로그인 성공");
       Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainPage()),
+        context,
+        MaterialPageRoute(builder: (_) => const MainPage()),
       );
-
     } catch (e) {
-      _showToast("로그인 중 오류가 발생했습니다.");
+      _showToast("로그인 실패: ${e.toString()}");
     }
   }
 
@@ -84,9 +87,7 @@ class _LoginPageState extends State<LoginPage> {
               SizedBox(height: 16),
               IconButton(
                 icon: Icon(Icons.arrow_back),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
+                onPressed: () => Navigator.pop(context),
               ),
               SizedBox(height: 8),
               Text(
@@ -152,7 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                   Text('비밀번호 찾기'),
                   Text('문의하기'),
                 ],
-              )
+              ),
             ],
           ),
         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../custom/custom_blue_button.dart';
 
 class SignupPage extends StatefulWidget {
@@ -134,11 +135,18 @@ class _SignupPageState extends State<SignupPage> {
       return;
     }
 
+    final email = '$emailLocal@$emailDomain';
+
     try {
-      await FirebaseFirestore.instance.collection('users').add({
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: pwd);
+
+      final uid = userCredential.user?.uid ?? '';
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'userId': userId,
         'nickName': nick,
-        'userEmail': '$emailLocal@$emailDomain',
+        'userEmail': email,
         'level': 1,
         'xp': 0,
         'streakCount': 0,
@@ -147,8 +155,7 @@ class _SignupPageState extends State<SignupPage> {
         'deleted': false,
         'notiEnable': true,
         'address': '',
-        'imgPath': '',
-        'password' : pwd
+        'imgPath': ''
       });
 
       _showToast("회원가입 완료!");
@@ -333,7 +340,7 @@ class _SignupPageState extends State<SignupPage> {
     );
   }
 }
-// 아이디 종복체크
+// id중복검사
 Future<bool> isUserIdDuplicate(String userId) async {
   final query = await FirebaseFirestore.instance
       .collection('users')
@@ -341,7 +348,7 @@ Future<bool> isUserIdDuplicate(String userId) async {
       .get();
   return query.docs.isNotEmpty;
 }
-// 닉네임 중복체크
+// 닉네임중복검사
 Future<bool> isNickNameDuplicate(String nickName) async {
   final query = await FirebaseFirestore.instance
       .collection('users')
