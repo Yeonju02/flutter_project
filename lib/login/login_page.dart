@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../custom/custom_blue_button.dart';
 import '../main/main_page.dart';
 import 'signup_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -57,6 +59,10 @@ class _LoginPageState extends State<LoginPage> {
         email: userEmail,
         password: password,
       );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('userId', userId);
+      await prefs.setString('userEmail', userEmail);
 
       _showToast("로그인 성공");
       Navigator.pushReplacement(
