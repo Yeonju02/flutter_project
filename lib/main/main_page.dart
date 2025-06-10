@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:routinelogapp/board/board_main_screen.dart';
 
 class MainPage extends StatelessWidget {
   const MainPage({super.key});
@@ -34,6 +35,13 @@ class MainPage extends StatelessWidget {
         selectedItemColor: Colors.black,
         unselectedItemColor: Colors.grey,
         currentIndex: 2,
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.push(context,
+              MaterialPageRoute(builder: (context) => const BoardMainScreen()),
+            );
+          }
+        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.attach_money), label: ''),
           BottomNavigationBarItem(icon: Icon(Icons.check_box), label: ''),
