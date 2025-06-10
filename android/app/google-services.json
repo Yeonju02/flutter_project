@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "970326676300",
+    "project_id": "routine-log-app",
+    "storage_bucket": "routine-log-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:970326676300:android:e5ce74c8ed06fd3c69f5e9",
+        "android_client_info": {
+          "package_name": "com.routinelog.routinelogapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCrjJyuCSZ6-fdxl5jBGCUKA_mn_0-sMCg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
