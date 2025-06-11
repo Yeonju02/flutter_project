@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import '../custom/date_slider.dart';
 import 'package:flutter_switch/flutter_switch.dart';
 import 'daily_routine.dart';
+import '../custom/custom_blue_button.dart';
+import 'new_routine.dart';
 
 class RoutineDetailPage extends StatefulWidget {
   final DateTime date;
@@ -15,7 +17,7 @@ class RoutineDetailPage extends StatefulWidget {
 
 class _RoutineDetailPageState extends State<RoutineDetailPage> {
   late DateTime selectedDate;
-  bool isDayMode = true;
+  bool isDayMode = false;
 
   @override
   void initState() {
@@ -32,11 +34,11 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
 
-            // 위쪽 묶음
+            // 연/월 + 뒤로가기 + 스위치
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -44,34 +46,25 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.arrow_back),
+                        icon: Icon(Icons.arrow_back),
                         onPressed: () => Navigator.pop(context),
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                        constraints: BoxConstraints(),
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       Text(
                         '${selectedDate.year}',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                       ),
                       Text(
                         selectedDate.month.toString().padLeft(2, '0'),
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
-
-                  const Spacer(),
-
-                  // 스위치: 전체 세로 높이 중간에 배치되도록 Align
+                  Spacer(),
                   Padding(
-                    padding: const EdgeInsets.only(top: 40.0),
+                    padding: EdgeInsets.only(top: 40.0),
                     child: FlutterSwitch(
                       width: 60,
                       height: 30,
@@ -93,7 +86,7 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
 
             // 날짜 슬라이더
             DateSlider(
@@ -105,10 +98,38 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
               },
             ),
 
-            const Divider(thickness: 1.2),
+            SizedBox(height: 20),
+            Divider(thickness: 1.2),
+            SizedBox(height: 20),
 
-            const SizedBox(height: 12),
-            const DailyRoutine(),
+            // 루틴 리스트
+            Expanded(child: DailyRoutine()),
+
+            Divider(thickness: 1.2),
+            SizedBox(height: 20),
+
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.0),
+              child: CustomBlueButton(
+                text: '루틴 추가하기',
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    ),
+                    builder: (context) => Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(context).viewInsets.bottom,
+                      ),
+                      child: NewRoutineSheet(selectedDate: selectedDate),
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 150),
           ],
         ),
       ),

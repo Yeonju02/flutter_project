@@ -1,31 +1,30 @@
 import 'package:flutter/material.dart';
 
-class RoutineBox extends StatefulWidget {
+class RoutineBox extends StatelessWidget {
   final String time;
   final String title;
   final bool hasAlarm;
+  final bool isChecked;
+  final VoidCallback onToggle;
 
   const RoutineBox({
     super.key,
     required this.time,
     required this.title,
-    this.hasAlarm = false,
+    required this.isChecked,
+    required this.hasAlarm,
+    required this.onToggle,
   });
 
   @override
-  State<RoutineBox> createState() => _RoutineBoxState();
-}
-
-class _RoutineBoxState extends State<RoutineBox> {
-  bool isChecked = false;
-
-  @override
   Widget build(BuildContext context) {
-    final Color selectedColor = const Color(0xFF92BBE2);
+    final Color selectedColor =  Color(0xFF92BBE2);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    return AnimatedContainer(
+      duration:  Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      margin:  EdgeInsets.only(bottom: 12),
+      padding:  EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: isChecked ? selectedColor : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(12),
@@ -33,42 +32,42 @@ class _RoutineBoxState extends State<RoutineBox> {
       child: Row(
         children: [
           Text(
-            widget.time,
+            time,
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: isChecked ? Colors.white : Colors.black,
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Text(
-              widget.title,
+              title,
               style: TextStyle(
                 fontSize: 16,
                 color: isChecked ? Colors.white : Colors.black,
               ),
             ),
           ),
-          if (widget.hasAlarm)
+          if (hasAlarm)
             Icon(Icons.alarm, size: 18, color: isChecked ? Colors.white70 : Colors.grey),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           GestureDetector(
-            onTap: () {
-              setState(() {
-                isChecked = !isChecked;
-              });
-            },
+            onTap: onToggle,
             child: Container(
               width: 22,
               height: 22,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white,
               ),
-              child: Icon(
-                isChecked ? Icons.check : Icons.circle_outlined,
-                size: 18,
-                color: isChecked ? selectedColor : Colors.grey,
+              child: AnimatedSwitcher(
+                duration:  Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) {
+                  return ScaleTransition(scale: animation, child: child);
+                },
+                child: isChecked
+                    ? Icon(Icons.check, key:  ValueKey('checked'), size: 18, color: selectedColor)
+                    : Icon(Icons.circle_outlined, key:  ValueKey('unchecked'), size: 18, color: Colors.grey),
               ),
             ),
           ),
