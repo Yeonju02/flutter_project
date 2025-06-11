@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:routinelogapp/shop/payment.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -69,10 +70,19 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ),
             ElevatedButton.icon(
               onPressed: () {
-                // 결제 로직
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PaymentPage(
+                      productData: widget.data,
+                      quantity: quantity,
+                      selectedColor: selectedColor,
+                    ),
+                  ),
+                );
               },
               icon: const Icon(Icons.payment),
-              label: const Text('결제하기'),
+              label: const Text('주문하기'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black,
                 foregroundColor: Colors.white,

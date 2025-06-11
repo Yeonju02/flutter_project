@@ -187,7 +187,7 @@ class _CartPageState extends State<CartPage> {
 
               // 하단 결제 요약
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
                 child: Row(
                   children: [
                     Expanded(

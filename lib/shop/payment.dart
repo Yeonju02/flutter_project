@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -27,6 +28,27 @@ class _PaymentPageState extends State<PaymentPage> {
   final addressController = TextEditingController();
   final requestController = TextEditingController();
 
+  int pointAvailable = 0;
+  int pointUsed = 0;
+  final pointController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserPoint();
+  }
+
+  Future<void> _loadUserPoint() async {
+    const userId = 'cyj32148'; // 로그인한 사용자 ID로 대체
+    final doc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+
+    if (doc.exists) {
+      setState(() {
+        pointAvailable = doc.data()?['point'] ?? 0;
+      });
+    }
+  }
+
   @override
   void dispose() {
     nameController.dispose();
@@ -38,7 +60,9 @@ class _PaymentPageState extends State<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
-    final totalPrice = widget.productData['productPrice'] * widget.quantity;
+    final originalPrice = widget.productData['productPrice'] * widget.quantity;
+    final discount = (pointUsed >= 500 && pointUsed % 10 == 0 && pointUsed <= pointAvailable) ? pointUsed : 0;
+    final totalPrice = originalPrice - discount;
 
     return Scaffold(
       appBar: AppBar(title: const Text('결제하기')),
@@ -62,6 +86,44 @@ class _PaymentPageState extends State<PaymentPage> {
               _buildTextField(addressController, '주소', '배송 받을 주소를 입력하세요'),
               _buildTextField(requestController, '요청사항 (선택)', '문 앞에 놔주세요', optional: true),
               const Divider(height: 30),
+
+              const SizedBox(height: 30),
+              const Text('포인트 사용', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: pointController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        hintText: '사용할 포인트 입력',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          pointUsed = int.tryParse(value) ?? 0;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        pointUsed = pointAvailable;
+                        pointController.text = pointUsed.toString();
+                      });
+                    },
+                    child: const Text('모두 사용'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '사용 가능 포인트: ${formatter.format(pointAvailable)}P / 보유 포인트: ${formatter.format(pointAvailable)}P',
+                style: const TextStyle(color: Colors.grey),
+              ),
 
               // 총 결제 금액
               Row(
@@ -118,5 +180,20 @@ class _PaymentPageState extends State<PaymentPage> {
 
       // TODO: KG이니시스 웹뷰 결제창 열기 또는 서버 연동
     }
+
+    if (pointUsed > pointAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("보유 포인트를 초과했습니다.")),
+      );
+      return;
+    }
+
+    if (pointUsed > 0 && (pointUsed < 500 || pointUsed % 10 != 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("포인트는 500 이상, 10원 단위로만 사용 가능합니다.")),
+      );
+      return;
+    }
+
   }
 }
