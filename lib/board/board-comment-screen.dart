@@ -16,24 +16,36 @@ class _CommentScreenState extends State<CommentScreen> {
   final user = FirebaseAuth.instance.currentUser;
 
   String? _replyToId;
+  String? myNickName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMyNickName();
+  }
+
+  Future<void> _loadMyNickName() async {
+    if (user == null) return;
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user!.uid).get();
+    setState(() {
+      myNickName = userDoc.data()?['nickName'];
+    });
+  }
 
   Future<void> _submitComment() async {
     final content = _commentController.text.trim();
-    if (content.isEmpty || user == null) return;
-
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user!.uid).get();
-    final nickName = userDoc.data()?['nickName'] ?? '익명';
+    if (content.isEmpty || user == null || myNickName == null) return;
 
     await FirebaseFirestore.instance
         .collection('boards')
         .doc(widget.boardId)
         .collection('comments')
         .add({
-      'nickName': nickName,
+      'nickName': myNickName,
       'content': content,
       'parentId': _replyToId,
       'createdAt': Timestamp.now(),
-      'userId': user!.uid,
+      'userId': user!.uid, // 남겨두되 사용은 안 함
     });
 
     setState(() {
@@ -89,62 +101,72 @@ class _CommentScreenState extends State<CommentScreen> {
     );
   }
 
-  Widget _buildCommentTile(DocumentSnapshot doc, {int indent = 0}) {
+  Widget _buildCommentTile(DocumentSnapshot doc, {int indent = 0, bool showDivider = false}) {
     final data = doc.data() as Map<String, dynamic>;
     final createdAt = (data['createdAt'] as Timestamp).toDate();
     final updatedAt = data['updatedAt'] != null
         ? (data['updatedAt'] as Timestamp).toDate()
         : null;
-    final isMine = user?.uid == data['userId'];
+    final isMine = myNickName != null && data['nickName'] == myNickName;
     final timeAgo = _formatTimeAgo(createdAt);
 
-    return Padding(
-      padding: EdgeInsets.only(left: 16.0 * indent, right: 8, bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            leading: const CircleAvatar(
-              backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
-            ),
-            title: Row(
-              children: [
-                Text(data['nickName'] ?? '익명'),
-                const SizedBox(width: 6),
-                Text('· $timeAgo', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                if (updatedAt != null)
-                  const Text(' · 수정됨', style: TextStyle(fontSize: 12, color: Colors.grey)),
-              ],
-            ),
-            subtitle: Text(data['content'] ?? ''),
-            trailing: isMine
-                ? PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _editComment(doc.id, data['content']);
-                } else if (value == 'delete') {
-                  _deleteComment(doc.id);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'edit', child: Text('수정')),
-                const PopupMenuItem(value: 'delete', child: Text('삭제')),
-              ],
-            )
-                : null,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showDivider)
+          Padding(
+            padding: EdgeInsets.only(left: 16.0 * indent, right: 8),
+            child: const Divider(thickness: 1, height: 16, color: Colors.grey),
           ),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _replyToId = doc.id;
-              });
-              _commentController.text = '@${data['nickName']} ';
-            },
-            child: const Text('답글 달기', style: TextStyle(fontSize: 13)),
+        Padding(
+          padding: EdgeInsets.only(left: 16.0 * indent, right: 8, bottom: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
+                ),
+                title: Row(
+                  children: [
+                    Text(data['nickName'] ?? '익명'),
+                    const SizedBox(width: 6),
+                    Text('· $timeAgo', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    if (updatedAt != null)
+                      const Text(' · 수정됨', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+                subtitle: Text(data['content'] ?? ''),
+                trailing: isMine
+                    ? PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _editComment(doc.id, data['content']);
+                    } else if (value == 'delete') {
+                      _deleteComment(doc.id);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'edit', child: Text('수정')),
+                    const PopupMenuItem(value: 'delete', child: Text('삭제')),
+                  ],
+                )
+                    : null,
+              ),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _replyToId = doc.id;
+                  });
+                  _commentController.text = '@${data['nickName']} ';
+                },
+                child: const Text('답글 달기', style: TextStyle(fontSize: 13)),
+              ),
+              _buildReplies(doc.id, indent: indent + 1),
+            ],
           ),
-          _buildReplies(doc.id, indent: indent + 1),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -158,10 +180,19 @@ class _CommentScreenState extends State<CommentScreen> {
           .orderBy('createdAt')
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
         final replies = snapshot.data!.docs;
+
         return Column(
-          children: replies.map((reply) => _buildCommentTile(reply, indent: indent)).toList(),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: replies.asMap().entries.map((entry) {
+            final index = entry.key;
+            final reply = entry.value;
+            return _buildCommentTile(reply, indent: indent, showDivider: index == 0);
+          }).toList(),
         );
       },
     );
@@ -199,7 +230,6 @@ class _CommentScreenState extends State<CommentScreen> {
               },
             ),
           ),
-
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
