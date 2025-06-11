@@ -45,7 +45,7 @@ class _CommentScreenState extends State<CommentScreen> {
       'content': content,
       'parentId': _replyToId,
       'createdAt': Timestamp.now(),
-      'userId': user!.uid, // 남겨두되 사용은 안 함
+      'userId': user!.uid,
     });
 
     setState(() {
@@ -101,100 +101,78 @@ class _CommentScreenState extends State<CommentScreen> {
     );
   }
 
-  Widget _buildCommentTile(DocumentSnapshot doc, {int indent = 0, bool showDivider = false}) {
-    final data = doc.data() as Map<String, dynamic>;
-    final createdAt = (data['createdAt'] as Timestamp).toDate();
-    final updatedAt = data['updatedAt'] != null
-        ? (data['updatedAt'] as Timestamp).toDate()
-        : null;
-    final isMine = myNickName != null && data['nickName'] == myNickName;
+  Widget _buildCommentTile(Map<String, dynamic> data, String commentId, int indent, bool isMine, DateTime createdAt, DateTime? updatedAt) {
     final timeAgo = _formatTimeAgo(createdAt);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (showDivider)
-          Padding(
-            padding: EdgeInsets.only(left: 16.0 * indent, right: 8),
-            child: const Divider(thickness: 1, height: 16, color: Colors.grey),
+    return Padding(
+      padding: EdgeInsets.only(left: 16.0 * indent, right: 8, bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const CircleAvatar(
+            backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
           ),
-        Padding(
-          padding: EdgeInsets.only(left: 16.0 * indent, right: 8, bottom: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
-                ),
-                title: Row(
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(data['nickName'] ?? '익명'),
-                    const SizedBox(width: 6),
-                    Text('· $timeAgo', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                    if (updatedAt != null)
-                      const Text(' · 수정됨', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(data['nickName'] ?? '익명', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(width: 6),
+                              Text('· $timeAgo', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              if (updatedAt != null)
+                                const Text(' · 수정됨', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(data['content'] ?? ''),
+                        ],
+                      ),
+                    ),
+                    if (isMine)
+                      PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            _editComment(commentId, data['content']);
+                          } else if (value == 'delete') {
+                            _deleteComment(commentId);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(value: 'edit', child: Text('수정')),
+                          const PopupMenuItem(value: 'delete', child: Text('삭제')),
+                        ],
+                      ),
                   ],
                 ),
-                subtitle: Text(data['content'] ?? ''),
-                trailing: isMine
-                    ? PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      _editComment(doc.id, data['content']);
-                    } else if (value == 'delete') {
-                      _deleteComment(doc.id);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'edit', child: Text('수정')),
-                    const PopupMenuItem(value: 'delete', child: Text('삭제')),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _replyToId = commentId;
+                        });
+                        _commentController.text = '@${data['nickName']} ';
+                      },
+                      child: const Text('답글 달기', style: TextStyle(fontSize: 13)),
+                    ),
                   ],
-                )
-                    : null,
-              ),
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _replyToId = doc.id;
-                  });
-                  _commentController.text = '@${data['nickName']} ';
-                },
-                child: const Text('답글 달기', style: TextStyle(fontSize: 13)),
-              ),
-              _buildReplies(doc.id, indent: indent + 1),
-            ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReplies(String parentId, {int indent = 1}) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('boards')
-          .doc(widget.boardId)
-          .collection('comments')
-          .where('parentId', isEqualTo: parentId)
-          .orderBy('createdAt')
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        final replies = snapshot.data!.docs;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: replies.asMap().entries.map((entry) {
-            final index = entry.key;
-            final reply = entry.value;
-            return _buildCommentTile(reply, indent: indent, showDivider: index == 0);
-          }).toList(),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -218,15 +196,42 @@ class _CommentScreenState extends State<CommentScreen> {
                   .collection('boards')
                   .doc(widget.boardId)
                   .collection('comments')
-                  .where('parentId', isEqualTo: null)
                   .orderBy('createdAt', descending: false)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                 final docs = snapshot.data!.docs;
-                return ListView(
-                  children: docs.map((doc) => _buildCommentTile(doc)).toList(),
-                );
+
+                Map<String, List<QueryDocumentSnapshot>> repliesMap = {};
+                List<QueryDocumentSnapshot> topLevel = [];
+
+                for (var doc in docs) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final parentId = data['parentId'];
+                  if (parentId == null) {
+                    topLevel.add(doc);
+                  } else {
+                    repliesMap.putIfAbsent(parentId, () => []).add(doc);
+                  }
+                }
+
+                List<Widget> commentWidgets = [];
+                void addComments(List<QueryDocumentSnapshot> comments, int indent) {
+                  for (var doc in comments) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final createdAt = (data['createdAt'] as Timestamp).toDate();
+                    final updatedAt = data['updatedAt'] != null ? (data['updatedAt'] as Timestamp).toDate() : null;
+                    final isMine = myNickName != null && data['nickName'] == myNickName;
+
+                    commentWidgets.add(_buildCommentTile(data, doc.id, indent, isMine, createdAt, updatedAt));
+                    if (repliesMap.containsKey(doc.id)) {
+                      addComments(repliesMap[doc.id]!, indent + 1);
+                    }
+                  }
+                }
+
+                addComments(topLevel, 0);
+                return ListView(children: commentWidgets);
               },
             ),
           ),
@@ -265,3 +270,4 @@ class _CommentScreenState extends State<CommentScreen> {
     return '${diff.inDays}일 전';
   }
 }
+

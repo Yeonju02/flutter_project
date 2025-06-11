@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../board/board_main_screen.dart';
 import '../custom/routine_calendar.dart';
 import '../custom/xp_level_bar.dart';
 import '../custom/bottom_nav_bar.dart';
+import '../shop/shop_main.dart';
 import 'routine_detail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -115,6 +117,18 @@ class _MainPageState extends State<MainPage> {
             child: BottomNavBar(
               currentIndex: 2,
               onTap: (index) {
+                if (index == 0) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ShopMainPage()),
+                  );
+                }
+
+                if (index == 1) {
+                  Navigator.push(context,
+                    MaterialPageRoute(builder: (context) => const BoardMainScreen()),
+                  );
+                }
               },
             ),
           ),

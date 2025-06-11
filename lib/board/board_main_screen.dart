@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:routinelogapp/board/board-comment-screen.dart';
+import 'package:routinelogapp/board/board_comment_screen.dart';
 import 'package:routinelogapp/board/board_write_screen.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,6 +17,73 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
   String _sortOption = '최신글';
 
   final List<String> _categories = ['전체', '아침 루틴 후기/공유', '수면 관리 후기/공유', '제품/영상 추천', '공지사항'];
+
+  Future<void> _reportBoard(String boardId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final reportsRef = FirebaseFirestore.instance
+        .collection('boards')
+        .doc(boardId)
+        .collection('reports');
+
+    // 동일 사용자가 이미 신고했는지 확인
+    final existing = await reportsRef
+        .where('reporterId', isEqualTo: user.uid)
+        .get();
+
+    if (existing.docs.isNotEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이미 신고한 게시글입니다.')),
+        );
+      }
+      return;
+    }
+
+    // 신고 사유 선택
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('신고 사유를 선택해주세요'),
+        children: [
+          SimpleDialogOption(
+            child: const Text('욕설 / 비방'),
+            onPressed: () => Navigator.pop(context, '욕설 / 비방'),
+          ),
+          SimpleDialogOption(
+            child: const Text('광고 / 도배'),
+            onPressed: () => Navigator.pop(context, '광고 / 도배'),
+          ),
+          SimpleDialogOption(
+            child: const Text('부적절한 콘텐츠'),
+            onPressed: () => Navigator.pop(context, '부적절한 콘텐츠'),
+          ),
+          SimpleDialogOption(
+            child: const Text('기타'),
+            onPressed: () => Navigator.pop(context, '기타'),
+          ),
+        ],
+      ),
+    );
+
+    if (reason == null) return;
+
+    await reportsRef.add({
+      'boardId': boardId,
+      'commentId': null,
+      'reporterId': user.uid,
+      'reason': reason,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isResolved': false,
+    });
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('신고가 접수되었습니다.')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -146,7 +213,7 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                             Text(level, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                           ],
                         ),
-                        IconButton(icon: const Icon(Icons.flag), onPressed: () {}),
+                        IconButton(icon: const Icon(Icons.flag), onPressed: () => _reportBoard(post['boardId']),),
                       ],
                     ),
                   ),
