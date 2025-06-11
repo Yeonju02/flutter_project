@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../custom/custom_blue_button.dart';
+import '../custom/dialogs/recommend_routine_list.dart';
 
 class NewRoutineSheet extends StatefulWidget {
   final DateTime selectedDate;
@@ -13,44 +14,66 @@ class NewRoutineSheet extends StatefulWidget {
 }
 
 class _NewRoutineSheetState extends State<NewRoutineSheet> {
-  bool isEditingTitle = false;
-  bool isEditingGoal = false;
-
   final titleController = TextEditingController();
   final goalController = TextEditingController();
-  TimeOfDay selectedTime = TimeOfDay.now();
+  bool isEditingTitle = false;
+  bool isEditingGoal = false;
+  String routineCategory = 'custom';
+  TimeOfDay startTime = TimeOfDay.now();
+  TimeOfDay endTime = TimeOfDay.now();
+  bool showTimeError = false;
 
-  void _showCupertinoTimePicker() {
-    Duration initialDuration = Duration(
-      hours: selectedTime.hour,
-      minutes: selectedTime.minute,
+  void _showTimePicker({
+    required BuildContext outerContext,
+    required TimeOfDay initialTime,
+    required ValueChanged<TimeOfDay> onTimeSelected,
+  }) {
+    Duration selectedDuration = Duration(
+      hours: initialTime.hour,
+      minutes: initialTime.minute,
     );
 
     showCupertinoDialog(
-      context: context,
-      builder: (_) {
-        return CupertinoAlertDialog(
-          content: SizedBox(
-            height: 200,
-            child: CupertinoTimerPicker(
-              mode: CupertinoTimerPickerMode.hm,
-              initialTimerDuration: initialDuration,
-              onTimerDurationChanged: (Duration newDuration) {
-                setState(() {
-                  selectedTime = TimeOfDay(
-                    hour: newDuration.inHours,
-                    minute: newDuration.inMinutes % 60,
-                  );
-                });
-              },
-            ),
-          ),
-          actions: [
-            CupertinoDialogAction(
-              child:  Text('확인'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
+      context: outerContext,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return CupertinoAlertDialog(
+              content: SizedBox(
+                height: 200,
+                child: CupertinoTimerPicker(
+                  mode: CupertinoTimerPickerMode.hm,
+                  initialTimerDuration: selectedDuration,
+                  onTimerDurationChanged: (Duration newDuration) {
+                    selectedDuration = newDuration;
+                  },
+                ),
+              ),
+              actions: [
+                CupertinoDialogAction(
+                  child: const Text('확인'),
+                  onPressed: () {
+                    final selectedHour = selectedDuration.inHours;
+
+                    if (selectedHour >= 12) {
+                      setState(() {
+                        showTimeError = true;
+                      });
+                    } else {
+                      setState(() {
+                        showTimeError = false;
+                      });
+                      onTimeSelected(TimeOfDay(
+                        hour: selectedHour,
+                        minute: selectedDuration.inMinutes % 60,
+                      ));
+                    }
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -59,29 +82,28 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
   @override
   Widget build(BuildContext context) {
     final dateStr = DateFormat('yyyy-MM-dd').format(widget.selectedDate);
-    final timeStr = selectedTime.format(context);
+    final startStr = startTime.format(context);
+    final endStr = endTime.format(context);
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+      decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 상단 바
           Container(
             width: 40,
             height: 4,
-            margin: EdgeInsets.only(bottom: 20),
+            margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
               color: Colors.grey.shade300,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
 
-          // 제목
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -92,8 +114,8 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                   children: [
                     TextField(
                       controller: titleController,
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      decoration: InputDecoration(
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      decoration: const InputDecoration(
                         isDense: true,
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
@@ -132,44 +154,89 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
             ],
           ),
 
-          SizedBox(height: 30),
+          const SizedBox(height: 30),
 
-          // 시간 및 날짜
           Align(
             alignment: Alignment.centerLeft,
-            child: Text('시간 및 날짜', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            child: const Text('시간 및 날짜',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Row(
             children: [
-              Icon(Icons.calendar_today, size: 20),
-              SizedBox(width: 12),
-              Text(dateStr, style: TextStyle(fontSize: 16)),
+              const Icon(Icons.calendar_today, size: 20),
+              const SizedBox(width: 12),
+              Text(dateStr, style: const TextStyle(fontSize: 16)),
             ],
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Row(
             children: [
               GestureDetector(
-                onTap: _showCupertinoTimePicker,
-                child: Icon(Icons.access_time, size: 20),
+                onTap: () {
+                  _showTimePicker(
+                    outerContext: context,
+                    initialTime: startTime,
+                    onTimeSelected: (picked) {
+                      setState(() {
+                        startTime = picked;
+                      });
+                    },
+                  );
+                },
+                child: Row(
+                  children: [
+                    const Icon(Icons.access_time, size: 20),
+                    const SizedBox(width: 6),
+                    Text(startStr, style: const TextStyle(fontSize: 16)),
+                  ],
+                ),
               ),
-              SizedBox(width: 12),
-              Text(timeStr, style: TextStyle(fontSize: 16)),
+              const SizedBox(width: 12),
+              const Text('~', style: TextStyle(fontSize: 18)),
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: () {
+                  _showTimePicker(
+                    outerContext: context,
+                    initialTime: endTime,
+                    onTimeSelected: (picked) {
+                      setState(() {
+                        endTime = picked;
+                      });
+                    },
+                  );
+                },
+                child: Row(
+                  children: [
+                    const Icon(Icons.access_time, size: 20),
+                    const SizedBox(width: 6),
+                    Text(endStr, style: const TextStyle(fontSize: 16)),
+                  ],
+                ),
+              ),
             ],
           ),
+          if (showTimeError)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '오전 시간만 선택할 수 있어요.',
+                style: TextStyle(color: Colors.red.shade700, fontSize: 14),
+              ),
+            ),
 
-          SizedBox(height: 30),
-          Divider(thickness: 1),
-          SizedBox(height: 30),
+          const SizedBox(height: 30),
+          const Divider(thickness: 1),
+          const SizedBox(height: 30),
 
           Align(
             alignment: Alignment.centerLeft,
-            child: Text('목표', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            child: const Text('목표',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
-          // 목표 입력칸
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -180,8 +247,8 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                   children: [
                     TextField(
                       controller: goalController,
-                      style: TextStyle(fontSize: 16),
-                      decoration: InputDecoration(
+                      style: const TextStyle(fontSize: 16),
+                      decoration: const InputDecoration(
                         isDense: true,
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
@@ -209,7 +276,7 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.edit, size: 18, color: Colors.grey),
+                icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
                 onPressed: () {
                   setState(() {
                     isEditingGoal = true;
@@ -219,14 +286,69 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
             ],
           ),
 
-          SizedBox(height: 50),
+          const SizedBox(height: 30),
+
+          Column(
+            children: [
+              TextButton(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => RecommendRoutineList(
+                      titleController: titleController,
+                      onClose: () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          isEditingTitle = false;
+                          routineCategory = 'recommend';
+                        });
+                      },
+                    ),
+                  );
+                },
+                child: const Text(
+                  '아침 루틴에는 이런 것들이 있어요!',
+                  style: TextStyle(
+                    decoration: TextDecoration.underline,
+                    color: Colors.black87,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  // 나만의 루틴 가져오기 나중에 구현하기
+                },
+                child: const Text(
+                  '나만의 루틴 가져오기',
+                  style: TextStyle(
+                    decoration: TextDecoration.underline,
+                    color: Colors.black87,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 50),
           CustomBlueButton(
             text: '루틴 추가하기',
             onPressed: () {
+              if (routineCategory != 'recommend') {
+                routineCategory = 'custom';
+              }
+
+              print('제목: ${titleController.text}');
+              print('목표: ${goalController.text}');
+              print('시작 시간: ${startTime.format(context)}');
+              print('끝나는 시간: ${endTime.format(context)}');
+              print('루틴 카테고리: $routineCategory');
+
               Navigator.pop(context);
             },
           ),
-          SizedBox(height: 100),
+          const SizedBox(height: 40),
         ],
       ),
     );
