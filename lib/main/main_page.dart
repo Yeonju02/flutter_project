@@ -1,45 +1,123 @@
 import 'package:flutter/material.dart';
+import '../custom/routine_calendar.dart';
+import '../custom/xp_level_bar.dart';
+import '../custom/bottom_nav_bar.dart';
+import 'routine_detail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class MainPage extends StatelessWidget {
+class MainPage extends StatefulWidget {
   const MainPage({super.key});
+
+  @override
+  State<MainPage> createState() => _MainPageState();
+}
+
+class _MainPageState extends State<MainPage> {
+  DateTime _focusedDay = DateTime(2025, 6, 5);
+  DateTime? _selectedDay;
+
+  //final prefs = await SharedPreferences.getInstance();  위쪽 import랑 이거 두 줄 쓰면 SharedPreference로 저장된 로그인 id 불러올 수 있음
+  //final userId = prefs.getString('userId');
+
+  void _goToPrevMonth() {
+    setState(() {
+      _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
+    });
+  }
+
+  void _goToNextMonth() {
+    setState(() {
+      _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            const Text(
-              '2025.06',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Divider(thickness: 1),
-            Expanded(
-              child: Center(
-                child: Container(
-                  width: 250,
-                  height: 250,
-                  color: Colors.grey[300],
-                  child: const Center(child: Text('여기에 달력')),
-                ),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 90),
+              child: Column(
+                children: [
+                  SizedBox(height: 20),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: XPLevelBar(),
+                  ),
+                  SizedBox(height: 15),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.chevron_left),
+                          onPressed: _goToPrevMonth,
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${_focusedDay.year}',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '${_focusedDay.month.toString().padLeft(2, '0')}',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.chevron_right),
+                          onPressed: _goToNextMonth,
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 15),
+                  Divider(thickness: 1),
+                  Expanded(
+                    child: RoutineCalendar(
+                      focusedDay: _focusedDay,
+                      selectedDay: _selectedDay,
+                      onDaySelected: (selectedDay, focusedDay) {
+                        setState(() {
+                          _selectedDay = selectedDay;
+                          _focusedDay = focusedDay;
+                        });
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RoutineDetailPage(date: selectedDay),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.black,
-        unselectedItemColor: Colors.grey,
-        currentIndex: 2,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.attach_money), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.check_box), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.notifications_none), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: ''),
+          ),
+
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 30,  // 이거 안하면 너무 아래에 딱 붙는듯
+            child: BottomNavBar(
+              currentIndex: 2,
+              onTap: (index) {
+              },
+            ),
+          ),
         ],
       ),
     );
