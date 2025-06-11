@@ -1,25 +1,32 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import '../custom/custom_blue_button.dart';
+import '../firebase_options.dart';
 import 'login_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const StartPage());
 }
 
-class StartPage extends StatelessWidget {
+class StartPage extends StatefulWidget {
   const StartPage({super.key});
 
   @override
+  State<StartPage> createState() => _StartPageState();
+}
+
+class _StartPageState extends State<StartPage> {
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: MainApp(),
+      home : MainApp()
     );
   }
 }
-
 
 class MainApp extends StatefulWidget {
   const MainApp({super.key});
