@@ -43,10 +43,12 @@ class _MyPageMainState extends State<MyPageMain> {
   late List<Widget> tabContents = [];
   int selectedDeliveryTab = 0;
 
+  // 유저 정보 편집 기능
   final TextEditingController nicknameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
 
+  // 환경설정의 토글버튼 true/false
   bool bgNotification = true;
   bool commentNotification = true;
   bool likeNotification = false;
@@ -478,10 +480,6 @@ class _MyPageMainState extends State<MyPageMain> {
       ],
     );
   }
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
