@@ -1,23 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:routinelogapp/shop/product_detail.dart';
 import 'package:intl/intl.dart';
-
 import 'cart.dart';
+import 'product_detail.dart';
 
 class ShopMainPage extends StatefulWidget {
   const ShopMainPage({super.key});
-
   @override
   State<ShopMainPage> createState() => _ShopMainPageState();
 }
 
 class _ShopMainPageState extends State<ShopMainPage> {
-  String selectedCategory = '전체';
+  String selectedMainCategory = '전체';
+  String selectedSubCategory = '';
   String searchText = '';
 
+  // 예시 카테고리 맵
+  final Map<String, List<String>> categoryMap = {
+    '전체': [],
+    '수면 용품': ['수면 안대', '숙면베개', '무드등'],
+    '모닝 루틴': ['모닝 저널', '아로마오일'],
+    '운동 용품': ['요가매트', '물병', '운동복'],
+  };
+
   void _addToCart(Map<String, dynamic> product) async {
-    const userId = 'cyj32148'; // 예시 (로그인 시 받아온 사용자 ID로 대체)
+    const userId = 'cyj32148';
     final cartRef = FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
@@ -64,26 +71,56 @@ class _ShopMainPageState extends State<ShopMainPage> {
             ),
           ),
 
-          // 카테고리 필터
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              children: ['전체', '요가매트', '물병', '운동복', '악세서리']
-                  .map((category) => Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: ChoiceChip(
-                  label: Text(category),
-                  selected: selectedCategory == category,
-                  onSelected: (_) {
+          // 메인/서브 카테고리 선택
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 메인 카테고리 Dropdown
+                DropdownButton<String>(
+                  value: selectedMainCategory,
+                  items: categoryMap.keys.map((main) {
+                    return DropdownMenuItem(
+                      value: main,
+                      child: Text(main),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
                     setState(() {
-                      selectedCategory = category;
+                      selectedMainCategory = value!;
+                      selectedSubCategory = '';
                     });
                   },
                 ),
-              ))
-                  .toList(),
+
+                // 하위 카테고리 버튼
+                if (selectedMainCategory != '전체' && categoryMap[selectedMainCategory]!.isNotEmpty)
+                  SizedBox(
+                    height: 40,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: categoryMap[selectedMainCategory]!.map((sub) {
+                        final isSelected = selectedSubCategory == sub;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                selectedSubCategory = sub;
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isSelected ? Colors.black : Colors.grey[300],
+                              foregroundColor: isSelected ? Colors.white : Colors.black,
+                            ),
+                            child: Text(sub),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+              ],
             ),
           ),
 
@@ -102,10 +139,15 @@ class _ShopMainPageState extends State<ShopMainPage> {
                 var products = snapshot.data!.docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
                   final name = data['productName']?.toString() ?? '';
-                  final category = data['productCategory']?.toString() ?? '';
-                  final matchesCategory = selectedCategory == '전체' || category == selectedCategory;
+                  final category = data['productCategory'] ?? {};
+                  final main = category['main'] ?? '';
+                  final sub = category['sub'] ?? '';
+
+                  final matchesMain = selectedMainCategory == '전체' || main == selectedMainCategory;
+                  final matchesSub = selectedSubCategory.isEmpty || sub == selectedSubCategory;
                   final matchesSearch = name.contains(searchText);
-                  return matchesCategory && matchesSearch;
+
+                  return matchesMain && matchesSub && matchesSearch;
                 }).toList();
 
                 return GridView.builder(
@@ -136,15 +178,16 @@ class _ShopMainPageState extends State<ShopMainPage> {
           ),
         ],
       ),
+
+      // 장바구니 버튼
       floatingActionButton: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
-            .doc('cyj32148') // 실제 로그인 유저 ID로 변경 가능
+            .doc('cyj32148')
             .collection('cart')
             .snapshots(),
         builder: (context, snapshot) {
           int cartCount = snapshot.data?.docs.length ?? 0;
-
           return Stack(
             alignment: Alignment.topRight,
             children: [
@@ -152,9 +195,7 @@ class _ShopMainPageState extends State<ShopMainPage> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => CartPage(userId: 'cyj32148'),
-                    ),
+                    MaterialPageRoute(builder: (context) => CartPage(userId: 'cyj32148')),
                   );
                 },
                 backgroundColor: Colors.grey[200],
@@ -166,18 +207,10 @@ class _ShopMainPageState extends State<ShopMainPage> {
                   top: 0,
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
                     child: Text(
                       '$cartCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
-                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
                   ),
                 ),
@@ -185,14 +218,13 @@ class _ShopMainPageState extends State<ShopMainPage> {
           );
         },
       ),
+
+      // 하단 네비게이션 바
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Colors.black,
         unselectedItemColor: Colors.grey,
         currentIndex: 0,
-        onTap: (index) {
-          // 필요 시 페이지 이동 로직 추가
-        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.attach_money), label: '쇼핑'),
           BottomNavigationBarItem(icon: Icon(Icons.check_box), label: '루틴'),
@@ -200,10 +232,14 @@ class _ShopMainPageState extends State<ShopMainPage> {
           BottomNavigationBarItem(icon: Icon(Icons.notifications_none), label: '알림'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: '마이'),
         ],
+        onTap: (index) {
+          // 필요시 화면 이동 추가
+        },
       ),
     );
   }
 }
+
 
 class ProductCard extends StatefulWidget {
   final Map<String, dynamic> data;

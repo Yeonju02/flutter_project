@@ -39,7 +39,12 @@ dependencies:
   firebase_auth:
   shared_preferences:
   fluttertoast:
+  table_calendar:
+  flutter_switch: ^0.3.2
+  syncfusion_flutter_gauges:
   intl:
+  uuid: ^4.2.1
+  smooth_page_indicator: ^1.1.0
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -73,6 +78,8 @@ flutter:
   assets:
     - assets/g-logo.png
     - assets/google_icon.png
+    - assets/sun.png
+    - assets/moon.png
     - assets/products/
     - assets/reviews/
 

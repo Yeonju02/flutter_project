@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:routinelogapp/shop/shop_main.dart';
 
 class MainPage extends StatelessWidget {
   const MainPage({super.key});
@@ -35,15 +34,6 @@ class MainPage extends StatelessWidget {
         selectedItemColor: Colors.black,
         unselectedItemColor: Colors.grey,
         currentIndex: 2,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ShopMainPage()),
-            );
-          }
-          // 나중에 다른 아이콘(index)에 대해서도 추가 가능
-        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.attach_money), label: ''),
           BottomNavigationBarItem(icon: Icon(Icons.check_box), label: ''),
