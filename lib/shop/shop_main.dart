@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'cart.dart';
 import 'product_detail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ShopMainPage extends StatefulWidget {
   const ShopMainPage({super.key});
@@ -27,28 +28,29 @@ class _ShopMainPageState extends State<ShopMainPage> {
     '운동 용품': ['요가매트', '물병', '운동복'],
   };
 
-  void _addToCart(Map<String, dynamic> product) async {
-    const userId = 'cyj32148';
-    final cartRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .collection('cart');
+  String? userId;
 
-    await cartRef.doc(product['productId']).set({
-      'productId': product['productId'],
-      'productName': product['productName'],
-      'productPrice': product['productPrice'],
-      'thumbNail': product['imgPath'],
-      'addedAt': Timestamp.now(),
+  @override
+  void initState() {
+    super.initState();
+    _loadUserId();
+  }
+
+  Future<void> _loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userId = prefs.getString('userId');
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('장바구니에 추가되었습니다!')),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (userId == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('')),
       body: Stack(
@@ -205,7 +207,6 @@ class _ShopMainPageState extends State<ShopMainPage> {
                         final data = _displayedProducts[index].data() as Map<String, dynamic>;
                         return ProductCard(
                           data: data,
-                          onAddToCart: () => _addToCart(data),
                           onTap: () {
                             Navigator.push(
                               context,
@@ -235,7 +236,7 @@ class _ShopMainPageState extends State<ShopMainPage> {
       floatingActionButton: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
-            .doc('cyj32148')
+            .doc(userId!)
             .collection('cart')
             .snapshots(),
         builder: (context, snapshot) {
@@ -247,7 +248,7 @@ class _ShopMainPageState extends State<ShopMainPage> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => CartPage(userId: 'cyj32148')),
+                    MaterialPageRoute(builder: (context) => CartPage(userId: userId!)),
                   );
                 },
                 backgroundColor: Colors.grey[200],
@@ -295,13 +296,11 @@ class _ShopMainPageState extends State<ShopMainPage> {
 
 class ProductCard extends StatefulWidget {
   final Map<String, dynamic> data;
-  final VoidCallback onAddToCart;
   final VoidCallback onTap;
 
   const ProductCard({
     super.key,
     required this.data,
-    required this.onAddToCart,
     required this.onTap,
   });
 
@@ -364,17 +363,6 @@ class _ProductCardState extends State<ProductCard> {
                     image: DecorationImage(
                       image: AssetImage(data['imgPath']),
                       fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: widget.onAddToCart,
-                    child: const CircleAvatar(
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.add, size: 18),
                     ),
                   ),
                 ),

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:routinelogapp/shop/payment.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -19,6 +20,21 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   double averageScore = 0.0;
   int totalReviews = 0;
   Map<int, int> scoreCountMap = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
+
+  String? userId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserId();
+  }
+
+  Future<void> _loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userId = prefs.getString('userId');
+    });
+  }
 
   void _calculateReviewStats(List<QueryDocumentSnapshot> docs) {
     if (docs.isEmpty) {
@@ -68,27 +84,68 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               '총 가격\n${formatter.format(product['productPrice'] * quantity)}원',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => PaymentPage(
-                      productData: widget.data,
-                      quantity: quantity,
-                      selectedColor: selectedColor,
-                    ),
+            Row(
+              children: [
+                ElevatedButton(
+                  onPressed: () async {
+                    final cartRef = FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(userId!)
+                        .collection('cart');
+
+                    final cartItem = {
+                      'productId': product['productId'],
+                      'productName': product['productName'],
+                      'productPrice': product['productPrice'],
+                      'thumbNail': product['imgPath'],
+                      'selectedColor': selectedColor,
+                      'quantity': quantity,
+                      'addedAt': Timestamp.now(),
+                    };
+
+                    await cartRef.add(cartItem);
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('장바구니에 담겼습니다.')),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[200],
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                );
-              },
-              icon: const Icon(Icons.payment),
-              label: const Text('주문하기'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
+                  child: const Text('담아두기'),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    final orderItem = {
+                      'productId': product['productId'],
+                      'productName': product['productName'],
+                      'productPrice': product['productPrice'],
+                      'thumbNail': product['imgPath'],
+                      'selectedColor': selectedColor,
+                      'quantity': quantity,
+                    };
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PaymentPage(products: [orderItem]),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.payment),
+                  label: const Text('주문하기'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -157,9 +214,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             // 설명
             const Text('제품 설명', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            const Text(
-              '이 요가매트는 소프트하고 어쩌구 저쩌구 라라라라온흐흠르노어러 | 느러 | 뒤',
-              style: TextStyle(height: 1.5),
+            Text(
+              product['description'],
+              style: const TextStyle(height: 1.5),
             ),
             const SizedBox(height: 12),
 
@@ -199,8 +256,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 ),
               ],
             ),
-
-            const SizedBox(height: 20),
 
             // 리뷰 목록
             const Divider(height: 32),
@@ -353,52 +408,86 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       },
       child: Container(
         margin: const EdgeInsets.only(right: 12),
-        width: 30,
-        height: 30,
-        child: Stack(
-          alignment: Alignment.center,
+        child: Column(
           children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                if (isSelected)
+                  const Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+              ],
             ),
-            if (isSelected)
-              const Icon(
-                Icons.check,
-                color: Colors.white,
-                size: 18,
-              ),
+            const SizedBox(height: 4),
+            Text(
+              _getColorLabel(colorId),
+              style: const TextStyle(fontSize: 12),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildReviewItem(Map<String, dynamic> review) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.star, color: Colors.amber[600], size: 16),
-              const SizedBox(width: 4),
-              Text('별점 ${review['rating']} - ${review['user']}'),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(review['content']),
-        ],
-      ),
-    );
+  String _getColorLabel(String id) {
+    switch (id.toLowerCase()) {
+      case 'blue':
+        return '블루';
+      case 'lightblue':
+        return '라이트 블루';
+      case 'navy':
+        return '네이비';
+      case 'skyblue':
+        return '스카이 블루';
+      case 'green':
+        return '그린';
+      case 'lightgreen':
+        return '라이트 그린';
+      case 'olive':
+        return '올리브';
+      case 'lime':
+        return '라임';
+      case 'red':
+        return '레드';
+      case 'pink':
+      case 'pinkaccent':
+        return '핑크';
+      case 'hotpink':
+        return '핫핑크';
+      case 'orange':
+        return '오렌지';
+      case 'yellow':
+        return '옐로우';
+      case 'gold':
+        return '골드';
+      case 'brown':
+        return '브라운';
+      case 'beige':
+        return '베이지';
+      case 'purple':
+        return '퍼플';
+      case 'lavender':
+        return '라벤더';
+      case 'white':
+        return '화이트';
+      case 'black':
+        return '블랙';
+      case 'gray':
+      case 'grey':
+        return '그레이';
+      default:
+        return id; // 정의되지 않은 색상은 그대로 표시
+    }
   }
 }
