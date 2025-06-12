@@ -1,3 +1,4 @@
+// 기존 import 그대로 유지
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -36,7 +37,7 @@ class _CommentScreenState extends State<CommentScreen> {
     final content = _commentController.text.trim();
     if (content.isEmpty || user == null || myNickName == null) return;
 
-    await FirebaseFirestore.instance
+    final commentRef = await FirebaseFirestore.instance
         .collection('boards')
         .doc(widget.boardId)
         .collection('comments')
@@ -47,6 +48,28 @@ class _CommentScreenState extends State<CommentScreen> {
       'createdAt': Timestamp.now(),
       'userId': user!.uid,
     });
+
+    final boardDoc = await FirebaseFirestore.instance
+        .collection('boards')
+        .doc(widget.boardId)
+        .get();
+
+    final boardOwnerId = boardDoc.data()?['userId'];
+
+    if (boardOwnerId != null && boardOwnerId != user!.uid) {
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(boardOwnerId)
+          .collection('notifications')
+          .add({
+        'notiType': 'comment',
+        'notiMsg': '$myNickName 님이 댓글을 남겼습니다',
+        'boardId': widget.boardId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
 
     setState(() {
       _replyToId = null;
@@ -270,4 +293,3 @@ class _CommentScreenState extends State<CommentScreen> {
     return '${diff.inDays}일 전';
   }
 }
-
