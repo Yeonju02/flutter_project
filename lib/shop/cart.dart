@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:routinelogapp/shop/payment.dart';
 
 class CartPage extends StatefulWidget {
   final String userId;
@@ -14,6 +15,7 @@ class _CartPageState extends State<CartPage> {
   Map<String, int> quantities = {};
   Map<String, bool> selected = {};
   final formatter = NumberFormat('#,###');
+  bool get _isAllSelected => selected.values.every((e) => e);
 
   @override
   Widget build(BuildContext context) {
@@ -30,14 +32,14 @@ class _CartPageState extends State<CartPage> {
         actions: [
           TextButton(
             onPressed: () {
-              final allSelected = selected.values.every((e) => e);
+              final newValue = !_isAllSelected;
               setState(() {
                 for (var key in selected.keys) {
-                  selected[key] = !allSelected;
+                  selected[key] = newValue;
                 }
               });
             },
-            child: const Text('전체 선택'),
+            child: Text(_isAllSelected ? '전체 해제' : '전체 선택'),
           ),
         ],
       ),
@@ -51,7 +53,8 @@ class _CartPageState extends State<CartPage> {
 
           for (var doc in docs) {
             final id = doc.id;
-            quantities[id] ??= 1;
+            final data = doc.data() as Map<String, dynamic>;
+            quantities[id] ??= data['quantity'] ?? 1; // 수량 반영
             selected[id] ??= true;
           }
 
@@ -71,7 +74,7 @@ class _CartPageState extends State<CartPage> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
-                      childAspectRatio: 0.7,
+                      childAspectRatio: 0.65,
                     ),
                     itemCount: docs.length,
                     itemBuilder: (context, index) {
@@ -152,6 +155,9 @@ class _CartPageState extends State<CartPage> {
                             const SizedBox(height: 4),
                             Text('${formatter.format(data['productPrice'])}원'),
                             const SizedBox(height: 4),
+                            // 색상 표시
+                            Text('색상: ${_getColorLabel(data['selectedColor'] ?? '기본색')}'),
+                            const SizedBox(height: 4),
 
                             // 수량 조절
                             Row(
@@ -187,7 +193,7 @@ class _CartPageState extends State<CartPage> {
 
               // 하단 결제 요약
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
                 child: Row(
                   children: [
                     Expanded(
@@ -196,10 +202,37 @@ class _CartPageState extends State<CartPage> {
                     ),
                     ElevatedButton.icon(
                       onPressed: () {
-                        // 결제 로직 연결
+                        // 선택된 상품 리스트 추출
+                        final selectedItems = selectedDocs.map((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final docId = doc.id;
+
+                          return {
+                            'productId': data['productId'],
+                            'productName': data['productName'],
+                            'productPrice': data['productPrice'],
+                            'thumbNail': data['thumbNail'],
+                            'quantity': quantities[docId],
+                            'selectedColor': data['selectedColor'] ?? '기본색', // 없으면 기본값 처리
+                          };
+                        }).toList();
+
+                        if (selectedItems.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("결제할 상품을 선택해주세요.")),
+                          );
+                          return;
+                        }
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PaymentPage(products: selectedItems),
+                          ),
+                        );
                       },
                       icon: const Icon(Icons.payment),
-                      label: const Text('결제하기'),
+                      label: const Text('주문하기'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
                         foregroundColor: Colors.white,
@@ -218,4 +251,49 @@ class _CartPageState extends State<CartPage> {
       ),
     );
   }
+  String _getColorLabel(String id) {
+    switch (id.toLowerCase()) {
+      case 'blue':
+        return '블루';
+      case 'green':
+        return '그린';
+      case 'pink':
+      case 'pinkaccent':
+        return '핑크';
+      case 'red':
+        return '레드';
+      case 'navy':
+        return '네이비';
+      case 'black':
+        return '블랙';
+      case 'white':
+        return '화이트';
+      case 'gray':
+      case 'grey':
+        return '그레이';
+      case 'orange':
+        return '오렌지';
+      case 'yellow':
+        return '옐로우';
+      case 'beige':
+        return '베이지';
+      case 'purple':
+        return '퍼플';
+      case 'lavender':
+        return '라벤더';
+      case 'skyblue':
+        return '스카이 블루';
+      case 'lime':
+        return '라임';
+      case 'olive':
+        return '올리브';
+      case 'gold':
+        return '골드';
+      default:
+        return id;
+    }
+  }
+
 }
+
+

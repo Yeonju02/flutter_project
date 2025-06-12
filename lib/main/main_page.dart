@@ -5,6 +5,7 @@ import '../custom/routine_calendar.dart';
 import '../custom/xp_level_bar.dart';
 import '../custom/bottom_nav_bar.dart';
 import '../shop/shop_main.dart';
+import '../mypage/myPage_main.dart';
 import 'routine_detail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

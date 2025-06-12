@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RoutineCalendar extends StatefulWidget {
   final DateTime focusedDay;
@@ -18,11 +20,53 @@ class RoutineCalendar extends StatefulWidget {
 }
 
 class _RoutineCalendarState extends State<RoutineCalendar> {
-  Map<DateTime, List<String>> _events = {
-    DateTime.utc(2025, 6, 3): ['7:30 기상하기'],
-    DateTime.utc(2025, 6, 5): ['7:30 기상하기', '8:30 10분 스트레칭 하기'],
-    DateTime.utc(2025, 6, 10): ['7:30 기상하기', '8:30 10분 스트레칭 하기', '8:40 밥먹기'],
-  };
+  Map<DateTime, List<String>> _events = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEvents();
+  }
+
+  Future<void> _loadEvents() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
+    if (userId == null) return;
+
+    final userQuery = await FirebaseFirestore.instance
+        .collection('users')
+        .where('userId', isEqualTo: userId)
+        .limit(1)
+        .get();
+
+    if (userQuery.docs.isEmpty) return;
+
+    final userDocId = userQuery.docs.first.id;
+
+    final routineSnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userDocId)
+        .collection('routineLogs')
+        .get();
+
+    Map<DateTime, List<String>> eventMap = {};
+
+    for (var doc in routineSnapshot.docs) {
+      final data = doc.data();
+      final dateStr = data['date'];
+      final title = data['title'];
+
+      if (dateStr != null && title != null) {
+        final date = DateTime.parse(dateStr);
+        final dateKey = DateTime.utc(date.year, date.month, date.day);
+        eventMap.putIfAbsent(dateKey, () => []).add(title);
+      }
+    }
+
+    setState(() {
+      _events = eventMap;
+    });
+  }
 
   List<String> _getEventsForDay(DateTime day) {
     return _events[DateTime.utc(day.year, day.month, day.day)] ?? [];
@@ -65,7 +109,7 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
             },
           ),
         ),
-        Divider(thickness: 2,color: Colors.grey,),
+        Divider(thickness: 2, color: Colors.grey),
         SizedBox(height: 8),
         ..._getEventsForDay(widget.selectedDay ?? widget.focusedDay).map(
               (event) => Padding(
@@ -80,12 +124,12 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
         ),
-
       ],
     );
   }

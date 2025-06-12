@@ -1,19 +1,24 @@
+import 'dart:ffi';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import '../custom/custom_blue_button.dart';
+import 'dart:io';
+
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // 사용자 인증 아이디 얻기 위해 필요
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 
+import '../board/board_main_screen.dart';
+import '../main/main_page.dart';
+import '../shop/shop_main.dart';
+import 'delivery_address.dart';
 
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  runApp(MyPage());
-}
+import '../custom/bottom_nav_bar.dart';
 
 
 
@@ -22,9 +27,7 @@ class MyPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: MyPageMain(),
-    );
+    return MyPageMain();
   }
 }
 
@@ -37,22 +40,24 @@ class MyPageMain extends StatefulWidget {
 
 class _MyPageMainState extends State<MyPageMain> {
 
-
-
+  int currentIndex = 4;
   int selectedTabIndex = 0;
   late List<Widget> tabContents = [];
   int selectedDeliveryTab = 0;
 
+  // 유저 정보 편집 기능
   final TextEditingController nicknameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
-  final TextEditingController addressController = TextEditingController();
+  // final TextEditingController addressController = TextEditingController();
 
+  // 환경설정의 토글버튼 true/false
   bool bgNotification = true;
   bool commentNotification = true;
   bool likeNotification = false;
 
 
 
+  /////// -firebase- ///////
 
   // user의 상세 정보 가져오기
   Map<String, dynamic>? userData;
@@ -67,7 +72,7 @@ class _MyPageMainState extends State<MyPageMain> {
             userData = doc.data();
             nicknameController.text = userData?['nickName'] ?? '';
             emailController.text = userData?['userEmail'] ?? '';
-            addressController.text = userData?['address'] ?? '';
+            // addressController.text = userData?['address'] ?? '';
           });
         } else {
           print("사용자 문서가 존재하지 않습니다.");
@@ -79,6 +84,70 @@ class _MyPageMainState extends State<MyPageMain> {
       print("fetchUserData 에러: $e");
     }
   }
+
+  // 배송 대기, 배송 완료 목록 가져오기
+  Future<List<Map<String, dynamic>>> fetchOrderList(bool isCompleted) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return [];
+
+    Query query = FirebaseFirestore.instance.collection('orders')
+        .where('userId', isEqualTo: user.uid);
+
+    if (isCompleted) {
+      // 배송 완료 목록
+      query = query.where('status', isEqualTo: 'completed');
+    } else {
+      // 배송 대기 목록 (배송 전, 배송 중)
+      query = query.where('status', whereIn: ['pending', 'shipping']);
+    }
+
+    final snapshot = await query.get();
+
+    return snapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+
+  }
+
+
+
+  List<Map<String, dynamic>> orderList = [];
+  bool isLoading = true;
+
+  void loadOrders() async {
+    try {
+      setState(() {
+        isLoading = true;
+      });
+
+      bool isCompleted = selectedDeliveryTab == 1; // 1이면 배송 완료 목록
+      orderList = await fetchOrderList(isCompleted);
+    } catch (e) {
+      print("배송 목록 로드 중 오류: $e");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+
+  // 1. 프로필 편집 다이얼로그 상태 변수
+  XFile? pickedImage; // 이미지 저장
+  String? originalImagePath; // 이미지 미리보기
+
+
+  // 2. 이미지 선택 함수 (Firebase 업로드 X)
+  Future<void> pickImageOnly() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source:ImageSource.gallery);
+    if(image != null) {
+      setState(() {
+        pickedImage = image;
+      });
+    }
+  }
+
+
+
 
 
   @override
@@ -94,10 +163,13 @@ class _MyPageMainState extends State<MyPageMain> {
       _orderHistory(),
       _settings()
     ];
+
+    // 배송 대기 목록 초기 로딩
+    loadOrders();
   }
 
 
-
+  /////// - 내 탭 매뉴 - ///////
 
   Widget _buildTabButton(String title, int index) {
     final isSelected = selectedTabIndex == index;
@@ -123,7 +195,8 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
 
-  // -프로필 편집 영역-
+  /////// - 프로필 편집 영역 -///////
+
 
   // 1) 닫기 버튼 눌렀을 때 나갈지 묻는 확인 다이얼로그 함수
   Widget buildCloseButtonDialog(BuildContext context) {
@@ -133,10 +206,17 @@ class _MyPageMainState extends State<MyPageMain> {
       actions: [
         TextButton(
           onPressed: () {
+            setState(() {
+              pickedImage == null;
+              if(originalImagePath != null) {
+                userData?['imgPath'] = originalImagePath;
+              }
+            });
             Navigator.of(context).pop(); // 확인 다이얼로그 닫기
             Navigator.of(context).pop(); // 편집 다이얼로그 닫기
           },
           child: Text('나가기', style: TextStyle(color: Colors.red)),
+
         ),
         TextButton(
           onPressed: () {
@@ -148,8 +228,12 @@ class _MyPageMainState extends State<MyPageMain> {
     );
   }
 
-// 2) 프로필 편집 내용 빌드 함수
-  Widget buildProfileEditContent(BuildContext context) {
+  // 2) 프로필 편집 내용 빌드 함수
+  Widget buildProfileEditContent(BuildContext context, void Function(void Function()) setDialogState) {
+    final originalNickname = nicknameController.text;
+    final originalEmail = emailController.text;
+    final originalImgPath = userData?['imgPath'];
+
     return SizedBox(
       width: 350,
       child: Padding(
@@ -170,11 +254,21 @@ class _MyPageMainState extends State<MyPageMain> {
                   IconButton(
                     icon: Icon(Icons.close),
                     onPressed: () {
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (context) => buildCloseButtonDialog(context),
-                      );
+                      final nicknameChanged = nicknameController.text != originalNickname;
+                      final emailChanged = emailController.text != originalEmail;
+                      final imageChanged = pickedImage != null;
+
+                      final isChanged = nicknameChanged || emailChanged || imageChanged;
+
+                      if (isChanged) {
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => buildCloseButtonDialog(context),
+                        );
+                      } else {
+                        Navigator.of(context).pop();
+                      }
                     },
                   ),
                 ],
@@ -186,12 +280,22 @@ class _MyPageMainState extends State<MyPageMain> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundImage: userData!['imgpath'] != null && userData!['imgpath'] != ''
-                          ? NetworkImage(userData!['imgpath'])
-                          : null,
-                      child: userData!['imgpath'] == '' ? Icon(Icons.person, size: 40) : null,
+                    GestureDetector(
+                      onTap: () async {
+                        await pickImageOnly();
+                      },
+                      child: CircleAvatar(
+                        radius: 40,
+                        backgroundImage: pickedImage != null
+                            ? FileImage(File(pickedImage!.path))
+                            : (originalImgPath != null && originalImgPath != ''
+                            ? NetworkImage(originalImgPath)
+                            : null),
+                        child: pickedImage == null &&
+                            (originalImgPath == null || originalImgPath == '')
+                            ? Icon(Icons.person, size: 40)
+                            : null,
+                      ),
                     ),
                     Positioned(
                       bottom: 0,
@@ -215,7 +319,7 @@ class _MyPageMainState extends State<MyPageMain> {
               Text("내 닉네임", style: TextStyle(fontWeight: FontWeight.w600)),
               SizedBox(height: 6),
               TextField(
-                controller: nicknameController,  // ← 여기 추가
+                controller: nicknameController,
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   enabledBorder: UnderlineInputBorder(
@@ -233,7 +337,7 @@ class _MyPageMainState extends State<MyPageMain> {
               Text("이메일", style: TextStyle(fontWeight: FontWeight.w600)),
               SizedBox(height: 6),
               TextField(
-                controller: emailController,  // ← 여기 추가
+                controller: emailController,
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   enabledBorder: UnderlineInputBorder(
@@ -243,25 +347,6 @@ class _MyPageMainState extends State<MyPageMain> {
                     borderSide: BorderSide(color: Color(0xFF92BBE2), width: 2),
                   ),
                   hintText: "이메일을 입력해주세요",
-                ),
-              ),
-
-              SizedBox(height: 16),
-
-              Text("주소", style: TextStyle(fontWeight: FontWeight.w600)),
-              SizedBox(height: 6),
-              TextField(
-                controller: addressController,  // ← 여기 추가
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF92BBE2), width: 2),
-                  ),
-                  hintText: "주소를 입력해주세요",
-                  hintStyle: TextStyle(color: Colors.grey[300]),
                 ),
               ),
 
@@ -277,22 +362,47 @@ class _MyPageMainState extends State<MyPageMain> {
                   ),
                   onPressed: () async {
                     final user = FirebaseAuth.instance.currentUser;
-                    if (user != null) {
-                      try {
-                        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-                          'nickName': nicknameController.text,
-                          'userEmail': emailController.text,
-                          'address': addressController.text,
-                        });
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('프로필이 성공적으로 저장되었습니다.')),
-                        );
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('저장에 실패했습니다: $e')),
-                        );
+                    if (user == null) return;
+
+                    try {
+                      Map<String, dynamic> updateData = {
+                        'nickName': nicknameController.text,
+                        'userEmail': emailController.text,
+                      };
+
+                      String? downloadUrl;
+
+                      if (pickedImage != null) {
+                        final ref = FirebaseStorage.instance
+                            .ref()
+                            .child('user_profile_images')
+                            .child('${user.uid}.jpg');
+
+                        await ref.putFile(File(pickedImage!.path));
+                        downloadUrl = await ref.getDownloadURL();
+                        updateData['imgPath'] = downloadUrl;
                       }
+
+                      await FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(user.uid)
+                          .update(updateData);
+
+                      setState(() {
+                        userData?['imgPath'] = downloadUrl ?? userData?['imgPath'];
+                        userData?['nickName'] = nicknameController.text;
+                        userData?['userEmail'] = emailController.text;
+                        pickedImage = null;
+                      });
+
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('프로필이 성공적으로 저장되었습니다.')),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('저장에 실패했습니다: $e')),
+                      );
                     }
                   },
                   child: Text(
@@ -310,7 +420,8 @@ class _MyPageMainState extends State<MyPageMain> {
 
 
 
-  // -내 게시물이 보일 부분
+
+  /////// - 내 게시물이 보일 부분 - ///////
 
   // 내 게시물의 영역
   Widget _grayBox() {
@@ -336,8 +447,7 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
 
-  // -주문 내역-
-
+  /////// - 주문 내역 - ///////
 
   // 내 주문 내역이 보일 영역
   Widget _orderHistory() {
@@ -354,10 +464,23 @@ class _MyPageMainState extends State<MyPageMain> {
         ),
         SizedBox(height: 24),
         Expanded(
-          child: Center(
-            child: Text(selectedDeliveryTab == 0 ? "배송 대기 목록" : "배송 완료 목록"),
+          child: isLoading
+              ? Text("로딩중...")
+              : orderList.isEmpty
+              ? Text("배송 내역이 없습니다.")
+              : ListView.builder(
+            itemCount: orderList.length,
+            itemBuilder: (context, index) {
+              final order = orderList[index];
+              return ListTile(
+                title: Text(order['productName'] ?? '상품명 없음'),
+                subtitle: Text("가격: ${order['productPrice']}원"),
+                trailing: Text(order['status'] == 'pending' ? '배송 대기' : '배송 완료'),
+              );
+            },
           ),
         ),
+
       ],
     );
   }
@@ -371,6 +494,7 @@ class _MyPageMainState extends State<MyPageMain> {
         setState(() {
           selectedDeliveryTab = index;
         });
+        loadOrders();
       },
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -392,16 +516,13 @@ class _MyPageMainState extends State<MyPageMain> {
       ),
     );
   }
-  
-  
-  
-  // -환경 설정-
-  
-  
+
+
+  /////// - 환경 설정- ///////
+
   // 환경 설정 콘텐츠가 보일 영역
   Widget _settings() {
     // 알림 상태 변수들
-
 
     return StatefulBuilder(
       builder: (context, setState) {
@@ -436,7 +557,12 @@ class _MyPageMainState extends State<MyPageMain> {
             SizedBox(height: 12,),
             Divider(),
             _buildSettingItem("결제 수단 관리", () {}),
-            _buildSettingItem("배송지 관리", () {}),
+            _buildSettingItem("배송지 관리", () {
+                Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => DeliveryAddressPage()),
+              );
+            }),
             _buildSettingItem("개인정보 처리방침", () {}),
             _buildSettingItem("회원 탈퇴", () {}, isDestructive: true),
           ],
@@ -479,10 +605,6 @@ class _MyPageMainState extends State<MyPageMain> {
     );
   }
 
-
-
-
-
   @override
   Widget build(BuildContext context) {
     if (userData == null) {
@@ -491,85 +613,108 @@ class _MyPageMainState extends State<MyPageMain> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        leading: BackButton(),
-        title: Text("마이페이지", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
+        title: const Text("마이페이지", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
       ),
-      body: Container(
-        child: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundImage: userData!['imgpath'] != null && userData!['imgpath'] != ''
-                        ? NetworkImage(userData!['imgpath'])
-                        : null,
-                    child: userData!['imgpath'] == '' ? Icon(Icons.person, size: 40) : null,
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(userData!['nickName'] ?? '', style: TextStyle(fontSize: 20)),
-                        SizedBox(height: 4),
-                        Text(userData!['userEmail'] ?? ''),
-                      ],
+      body: Stack(
+        children: [
+          // 기존 콘텐츠
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundImage: userData!['imgPath'] != null && userData!['imgPath'] != ''
+                          ? NetworkImage(userData!['imgPath'])
+                          : null,
+                      child: userData!['imgPath'] == '' ? const Icon(Icons.person, size: 40) : null,
                     ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.settings, color: Colors.black),
-                    onPressed: () async{
-                      await fetchUserData();
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          return StatefulBuilder(
-                            builder: (context, setState) {
-                              return Dialog(
-                                backgroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                elevation: 10,
-                                insetPadding: EdgeInsets.symmetric(horizontal: 40),
-                                child: buildProfileEditContent(context),
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(userData!['nickName'] ?? '', style: const TextStyle(fontSize: 20)),
+                          const SizedBox(height: 4),
+                          Text(userData!['userEmail'] ?? ''),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.settings, color: Colors.black),
+                      onPressed: () async {
+                        originalImagePath = userData?['imgPath'];
+                        pickedImage = null;
 
+                        await fetchUserData();
+                        showDialog(
+                          context: context,
+                          builder: (context) {
+                            return StatefulBuilder(
+                              builder: (context, setDialogState) {
+                                return Dialog(
+                                  backgroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  elevation: 10,
+                                  insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+                                    child: this.buildProfileEditContent(context, setDialogState)
+
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildTabButton("내 게시물", 0),
+                  _buildTabButton("주문 내역", 1),
+                  _buildTabButton("환경 설정", 2),
                 ],
               ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildTabButton("내 게시물", 0),
-                _buildTabButton("주문 내역", 1),
-                _buildTabButton("환경 설정", 2),
-              ],
-            ),
-            Divider(height: 15),
-
-            
-            Expanded(
-              child: Builder(
-                builder: (_) {
-                  if (selectedTabIndex == 0) return myPost();
-                  if (selectedTabIndex == 1) return _orderHistory();
-                  return _settings();
-                },
+              const Divider(height: 15),
+              Expanded(
+                child: Builder(
+                  builder: (_) {
+                    if (selectedTabIndex == 0) return myPost();
+                    if (selectedTabIndex == 1) return _orderHistory();
+                    return _settings();
+                  },
+                ),
               ),
+              const SizedBox(height: 80), // 네비게이션 바 높이 고려 여유 공간
+            ],
+          ),
+
+          // 하단 네비게이션 삽입
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 30,
+            child: BottomNavBar(
+              currentIndex: 4, // 마이페이지니까 4번
+              onTap: (index) {
+                if (index == 0) {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const ShopMainPage()));
+                } else if (index == 1) {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const BoardMainScreen()));
+                } else if (index == 2) {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const MainPage()));
+                }
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
