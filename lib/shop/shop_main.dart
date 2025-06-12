@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'cart.dart';
 import 'product_detail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ShopMainPage extends StatefulWidget {
   const ShopMainPage({super.key});
@@ -14,6 +15,10 @@ class _ShopMainPageState extends State<ShopMainPage> {
   String selectedMainCategory = '전체';
   String selectedSubCategory = '';
   String searchText = '';
+  bool _isLoading = false;
+  List<DocumentSnapshot> _displayedProducts = [];
+  String _pendingMainCategory = '';
+  String _pendingSubCategory = '';
 
   // 예시 카테고리 맵
   final Map<String, List<String>> categoryMap = {
@@ -23,159 +28,207 @@ class _ShopMainPageState extends State<ShopMainPage> {
     '운동 용품': ['요가매트', '물병', '운동복'],
   };
 
-  void _addToCart(Map<String, dynamic> product) async {
-    const userId = 'cyj32148';
-    final cartRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .collection('cart');
+  String? userId;
 
-    await cartRef.doc(product['productId']).set({
-      'productId': product['productId'],
-      'productName': product['productName'],
-      'productPrice': product['productPrice'],
-      'thumbNail': product['imgPath'],
-      'addedAt': Timestamp.now(),
+  @override
+  void initState() {
+    super.initState();
+    _loadUserId();
+  }
+
+  Future<void> _loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userId = prefs.getString('userId');
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('장바구니에 추가되었습니다!')),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (userId == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('')),
-      body: Column(
+      body: Stack(
         children: [
-          // 검색창
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: TextField(
-              onChanged: (value) {
-                setState(() {
-                  searchText = value;
-                });
-              },
-              decoration: InputDecoration(
-                hintText: '검색',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.grey[200],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-
-          // 메인/서브 카테고리 선택
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 메인 카테고리 Dropdown
-                DropdownButton<String>(
-                  value: selectedMainCategory,
-                  items: categoryMap.keys.map((main) {
-                    return DropdownMenuItem(
-                      value: main,
-                      child: Text(main),
-                    );
-                  }).toList(),
+          Column(
+            children: [
+              // 검색창
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: TextField(
                   onChanged: (value) {
                     setState(() {
-                      selectedMainCategory = value!;
-                      selectedSubCategory = '';
+                      searchText = value;
                     });
                   },
-                ),
-
-                // 하위 카테고리 버튼
-                if (selectedMainCategory != '전체' && categoryMap[selectedMainCategory]!.isNotEmpty)
-                  SizedBox(
-                    height: 40,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: categoryMap[selectedMainCategory]!.map((sub) {
-                        final isSelected = selectedSubCategory == sub;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                selectedSubCategory = sub;
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isSelected ? Colors.black : Colors.grey[300],
-                              foregroundColor: isSelected ? Colors.white : Colors.black,
-                            ),
-                            child: Text(sub),
-                          ),
-                        );
-                      }).toList(),
+                  decoration: InputDecoration(
+                    hintText: '검색',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: Colors.grey[200],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: BorderSide.none,
                     ),
                   ),
-              ],
-            ),
-          ),
+                ),
+              ),
 
-          const SizedBox(height: 10),
+              // 메인/서브 카테고리 선택
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 메인 카테고리 드롭다운 (왼쪽)
+                    DropdownButton<String>(
+                      value: categoryMap.containsKey(selectedMainCategory)
+                          ? selectedMainCategory
+                          : categoryMap.keys.first,
+                      items: categoryMap.keys.map((main) {
+                        return DropdownMenuItem(
+                          value: main,
+                          child: Text(main),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        if (value != null && categoryMap.containsKey(value)) {
+                          setState(() {
+                            _isLoading = true;
+                            _pendingMainCategory = value;
+                            _pendingSubCategory = '';
+                          });
+                          Future.delayed(const Duration(milliseconds: 700), () {
+                            setState(() {
+                              selectedMainCategory = _pendingMainCategory;
+                              selectedSubCategory = _pendingSubCategory;
+                              _isLoading = false;
+                            });
+                          });
+                        }
+                      },
+                    ),
 
-          // 상품 리스트
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('products')
-                  .orderBy('createdAt', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                    const SizedBox(width: 10),
 
-                var products = snapshot.data!.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final name = data['productName']?.toString() ?? '';
-                  final category = data['productCategory'] ?? {};
-                  final main = category['main'] ?? '';
-                  final sub = category['sub'] ?? '';
+                    // 하위 카테고리 버튼들 (오른쪽)
+                    if (selectedMainCategory != '전체' && categoryMap[selectedMainCategory]!.isNotEmpty)
+                      Expanded(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: categoryMap[selectedMainCategory]!.map((sub) {
+                              final isSelected = selectedSubCategory == sub;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isLoading = true;
+                                      _pendingSubCategory = sub;
+                                    });
 
-                  final matchesMain = selectedMainCategory == '전체' || main == selectedMainCategory;
-                  final matchesSub = selectedSubCategory.isEmpty || sub == selectedSubCategory;
-                  final matchesSearch = name.contains(searchText);
+                                    Future.delayed(const Duration(milliseconds: 700), () {
+                                      setState(() {
+                                        selectedSubCategory = _pendingSubCategory;
+                                        _isLoading = false;
+                                      });
+                                    });
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isSelected ? Colors.black : Colors.grey[300],
+                                    foregroundColor: isSelected ? Colors.white : Colors.black,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    minimumSize: const Size(0, 36),
+                                  ),
+                                  child: Text(sub),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
 
-                  return matchesMain && matchesSub && matchesSearch;
-                }).toList();
+              const SizedBox(height: 10),
 
-                return GridView.builder(
-                  padding: const EdgeInsets.all(12),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.9,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    final data = products[index].data() as Map<String, dynamic>;
-                    return ProductCard(
-                      data: data,
-                      onAddToCart: () => _addToCart(data),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => ProductDetailPage(data: data)),
+              // 상품 리스트
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('products')
+                      .orderBy('createdAt', descending: true)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    // 모든 상품 받아오기
+                    final allProducts = snapshot.data!.docs;
+
+                    // 👉 필터링된 상품 리스트 임시 저장
+                    final filtered = allProducts.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final name = data['productName']?.toString() ?? '';
+                      final category = data['productCategory'] ?? {};
+                      final main = category['main'] ?? '';
+                      final sub = category['sub'] ?? '';
+
+                      final matchesMain = selectedMainCategory == '전체' || main == selectedMainCategory;
+                      final matchesSub = selectedSubCategory.isEmpty || sub == selectedSubCategory;
+                      final matchesSearch = name.contains(searchText);
+
+                      return matchesMain && matchesSub && matchesSearch;
+                    }).toList();
+
+                    // ✅ 최초 한 번만 표시하거나 로딩이 끝난 후 교체
+                    if (!_isLoading) {
+                      _displayedProducts = filtered;
+                    }
+
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(12),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 0.9,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                      ),
+                      itemCount: _displayedProducts.length,
+                      itemBuilder: (context, index) {
+                        final data = _displayedProducts[index].data() as Map<String, dynamic>;
+                        return ProductCard(
+                          data: data,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => ProductDetailPage(data: data)),
+                            );
+                          },
                         );
                       },
                     );
                   },
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
+
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
+            ),
         ],
       ),
 
@@ -183,7 +236,7 @@ class _ShopMainPageState extends State<ShopMainPage> {
       floatingActionButton: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
-            .doc('cyj32148')
+            .doc(userId!)
             .collection('cart')
             .snapshots(),
         builder: (context, snapshot) {
@@ -195,7 +248,7 @@ class _ShopMainPageState extends State<ShopMainPage> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => CartPage(userId: 'cyj32148')),
+                    MaterialPageRoute(builder: (context) => CartPage(userId: userId!)),
                   );
                 },
                 backgroundColor: Colors.grey[200],
@@ -243,13 +296,11 @@ class _ShopMainPageState extends State<ShopMainPage> {
 
 class ProductCard extends StatefulWidget {
   final Map<String, dynamic> data;
-  final VoidCallback onAddToCart;
   final VoidCallback onTap;
 
   const ProductCard({
     super.key,
     required this.data,
-    required this.onAddToCart,
     required this.onTap,
   });
 
@@ -312,17 +363,6 @@ class _ProductCardState extends State<ProductCard> {
                     image: DecorationImage(
                       image: AssetImage(data['imgPath']),
                       fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: widget.onAddToCart,
-                    child: const CircleAvatar(
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.add, size: 18),
                     ),
                   ),
                 ),
