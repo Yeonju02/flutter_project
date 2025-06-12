@@ -5,6 +5,9 @@ import 'package:flutter_switch/flutter_switch.dart';
 import 'daily_routine.dart';
 import '../custom/custom_blue_button.dart';
 import 'new_routine.dart';
+import '../custom/bottom_nav_bar.dart';
+import '../shop/shop_main.dart';
+import '../board/board_main_screen.dart';
 
 class RoutineDetailPage extends StatefulWidget {
   final DateTime date;
@@ -103,7 +106,7 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
             SizedBox(height: 20),
 
             // 루틴 리스트
-            Expanded(child: DailyRoutine()),
+            Expanded(child: DailyRoutine(selectedDate: selectedDate,routineType: isDayMode ? 'night' : 'morning',)),
 
             Divider(thickness: 1.2),
             SizedBox(height: 20),
@@ -129,7 +132,8 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
                 },
               ),
             ),
-            SizedBox(height: 150),
+            SizedBox(height: 100),
+
           ],
         ),
       ),
