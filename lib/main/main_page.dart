@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../board/board_main_screen.dart';
 import '../custom/routine_calendar.dart';
 import '../custom/xp_level_bar.dart';
@@ -124,13 +125,16 @@ class _MainPageState extends State<MainPage> {
                     MaterialPageRoute(builder: (context) => const ShopMainPage()),
                   );
                 }
+
                 if (index == 1) {
                   Navigator.push(context,
                     MaterialPageRoute(builder: (context) => const BoardMainScreen()),
                   );
                 }
-                if(index == 4) {
-                  Navigator.push(context,
+
+                if (index == 4) {
+                  Navigator.push(
+                    context,
                     MaterialPageRoute(builder: (context) => const MyPage()),
                   );
                 }
