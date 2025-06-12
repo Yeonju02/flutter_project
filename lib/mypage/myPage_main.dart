@@ -201,32 +201,32 @@ class _MyPageMainState extends State<MyPageMain> {
   // 1) 닫기 버튼 눌렀을 때 나갈지 묻는 확인 다이얼로그 함수
   Widget buildCloseButtonDialog(BuildContext context) {
     return AlertDialog(
-      title: Text('저장하지 않고 나가시겠습니까?'),
+      title: Text('변경사항을 저장하지 않고 나가시겠습니까?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),),
       content: Text('저장하지 않으면 변경사항이 반영되지 않습니다.'),
       actions: [
         TextButton(
+          child: Text('나가기', style: TextStyle(color: Colors.red)),
           onPressed: () {
             setState(() {
-              pickedImage == null;
-              if(originalImagePath != null) {
+              pickedImage = null;
+              if (originalImagePath != null) {
                 userData?['imgPath'] = originalImagePath;
               }
             });
-            Navigator.of(context).pop(); // 확인 다이얼로그 닫기
-            Navigator.of(context).pop(); // 편집 다이얼로그 닫기
+            Navigator.of(context).pop(); // 다이얼로그 닫기
+            Navigator.of(context).pop(); // 프로필 편집 닫기
           },
-          child: Text('나가기', style: TextStyle(color: Colors.red)),
-
         ),
         TextButton(
-          onPressed: () {
-            Navigator.of(context).pop(); // 확인 다이얼로그 닫기, 편집 유지
-          },
           child: Text('취소'),
+          onPressed: () {
+            Navigator.of(context).pop(); // 다이얼로그 닫기만
+          },
         ),
       ],
     );
   }
+
 
   // 2) 프로필 편집 내용 빌드 함수
   Widget buildProfileEditContent(BuildContext context, void Function(void Function()) setDialogState) {
@@ -653,6 +653,7 @@ class _MyPageMainState extends State<MyPageMain> {
 
                         await fetchUserData();
                         showDialog(
+                          barrierDismissible: false,
                           context: context,
                           builder: (context) {
                             return StatefulBuilder(
