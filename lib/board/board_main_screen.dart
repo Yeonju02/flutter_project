@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:routinelogapp/board/board-comment-screen.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:routinelogapp/admin/admin_board_page.dart';
+import 'package:routinelogapp/board/board_comment_screen.dart';
 import 'package:routinelogapp/board/board_write_screen.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class BoardMainScreen extends StatefulWidget {
   const BoardMainScreen({super.key});
@@ -15,7 +18,6 @@ class BoardMainScreen extends StatefulWidget {
 class _BoardMainScreenState extends State<BoardMainScreen> {
   String _selectedCategory = '전체';
   String _sortOption = '최신글';
-
   final List<String> _categories = ['전체', '아침 루틴 후기/공유', '수면 관리 후기/공유', '제품/영상 추천', '공지사항'];
 
   @override
@@ -50,62 +52,163 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                       setState(() => _sortOption = value);
                     }
                   },
-                )
+                ),
               ],
             ),
           ),
           const Divider(thickness: 1),
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('boards')
-                  .orderBy(
-                _sortOption == '최신글' ? 'createdAt' : 'likeCount',
-                descending: true,
-              )
-                  .snapshots(),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _getVisiblePosts(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text('게시글이 없습니다.'));
-                }
 
-                final docs = snapshot.data!.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return data['isDeleted'] != true;
-                }).toList();
-
-                final filteredDocs = _selectedCategory == '전체'
-                    ? docs
-                    : docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  return data['boardCategory'] == _selectedCategory;
-                }).toList();
+                final posts = snapshot.data ?? [];
+                if (posts.isEmpty) return const Center(child: Text('게시글이 없습니다.'));
 
                 return ListView.builder(
-                  itemCount: filteredDocs.length,
+                  itemCount: posts.length,
                   itemBuilder: (context, index) {
-                    final post = filteredDocs[index].data() as Map<String, dynamic>;
-                    return _buildPostCard(post);
+                    final post = posts[index];
+                    return post['__isReported'] == true
+                        ? _buildReportedCard()
+                        : _buildPostCard(post);
                   },
                 );
               },
             ),
           ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => AdminBoardPage()));
+            },
+            child: const Text("일단 게시판관리 페이지 여기서 이동"),
+          )
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          Navigator.push(context,
-            MaterialPageRoute(builder: (context) => BoardWriteScreen()),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (_) => BoardWriteScreen()));
         },
         label: const Text('글쓰기'),
         icon: const Icon(Icons.edit),
       ),
     );
+  }
+
+  Future<List<Map<String, dynamic>>> _getVisiblePosts() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final snapshot = await FirebaseFirestore.instance
+        .collection('boards')
+        .orderBy(_sortOption == '최신글' ? 'createdAt' : 'likeCount', descending: true)
+        .get();
+
+    final filtered = <Map<String, dynamic>>[];
+
+    for (final doc in snapshot.docs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      data['boardId'] = doc.id;
+
+      if (data['isDeleted'] == true) continue;
+      if (_selectedCategory != '전체' && data['boardCategory'] != _selectedCategory) continue;
+
+      final reports = await FirebaseFirestore.instance
+          .collection('boards')
+          .doc(data['boardId'])
+          .collection('reports')
+          .where('reporterId', isEqualTo: user?.uid)
+          .get();
+
+      if (reports.docs.isNotEmpty) {
+        data['__isReported'] = true;
+      }
+
+      filtered.add(data);
+    }
+
+    return filtered;
+  }
+
+  Future<void> _reportBoard(String boardId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final reportsRef = FirebaseFirestore.instance.collection('boards').doc(boardId).collection('reports');
+    final existing = await reportsRef.where('reporterId', isEqualTo: user.uid).get();
+
+    if (existing.docs.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이미 신고한 게시글입니다.')),
+      );
+      return;
+    }
+
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('신고 사유를 선택해주세요'),
+        children: [
+          SimpleDialogOption(child: const Text('욕설 / 비방'), onPressed: () => Navigator.pop(context, '욕설 / 비방')),
+          SimpleDialogOption(child: const Text('광고 / 도배'), onPressed: () => Navigator.pop(context, '광고 / 도배')),
+          SimpleDialogOption(child: const Text('부적절한 콘텐츠'), onPressed: () => Navigator.pop(context, '부적절한 콘텐츠')),
+          SimpleDialogOption(child: const Text('기타'), onPressed: () => Navigator.pop(context, '기타')),
+        ],
+      ),
+    );
+
+    if (reason == null) return;
+
+    await reportsRef.add({
+      'boardId': boardId,
+      'commentId': null,
+      'reporterId': user.uid,
+      'reason': reason,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isResolved': false,
+    });
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('신고가 접수되었습니다.')),
+      );
+    }
+
+    setState(() {});
+  }
+
+  Widget _buildReportedCard() {
+    return Card(
+      margin: const EdgeInsets.all(12),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Center(
+          child: Text('\u{1F6AB} 신고한 게시글입니다', style: TextStyle(color: Colors.grey[600])),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onOpenLink(LinkableElement link) async {
+    String rawUrl = link.url.trim();
+
+    if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
+      rawUrl = 'https://$rawUrl';
+    }
+
+    final url = Uri.parse(rawUrl);
+
+    final success = await launchUrl(
+      url,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('URL을 열 수 없습니다')),
+      );
+    }
   }
 
   Widget _buildPostCard(Map<String, dynamic> post) {
@@ -122,14 +225,15 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
         return FutureBuilder<DocumentSnapshot>(
           future: FirebaseFirestore.instance.collection('users').doc(post['userId']).get(),
           builder: (context, userSnapshot) {
-            final level = userSnapshot.hasData ? 'LV.${userSnapshot.data!.get('level').toString()}' : 'LV.?';
+            final level = userSnapshot.hasData
+                ? 'LV.${userSnapshot.data!.get('level').toString()}'
+                : 'LV.?';
 
             return Card(
               margin: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 유저 정보
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
                     child: Row(
@@ -146,88 +250,159 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                             Text(level, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                           ],
                         ),
-                        IconButton(icon: const Icon(Icons.flag), onPressed: () {}),
+                        Row(
+                          children: [
+                            if (userId != post['userId'])
+                              IconButton(
+                                icon: const Icon(Icons.flag),
+                                onPressed: () => _reportBoard(post['boardId']),
+                              ),
+                            if (userId == post['userId'])
+                              PopupMenuButton<String>(
+                                padding: EdgeInsets.zero, // 내부 공백 제거
+                                onSelected: (value) async {
+                                  if (value == 'edit') {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => BoardWriteScreen(post: post),
+                                      ),
+                                    );
+                                  } else if (value == 'delete') {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('삭제 확인'),
+                                        content: const Text('이 게시글을 삭제하시겠습니까?'),
+                                        actions: [
+                                          TextButton(child: const Text('취소'), onPressed: () => Navigator.pop(context, false)),
+                                          TextButton(child: const Text('삭제'), onPressed: () => Navigator.pop(context, true)),
+                                        ],
+                                      ),
+                                    );
+
+                                    if (confirm == true) {
+                                      await FirebaseFirestore.instance
+                                          .collection('boards')
+                                          .doc(post['boardId'])
+                                          .update({'isDeleted': true});
+
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('게시글이 삭제되었습니다.')),
+                                        );
+                                      }
+
+                                      setState(() {});
+                                    }
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(value: 'edit', child: Text('수정')),
+                                  const PopupMenuItem(value: 'delete', child: Text('삭제')),
+                                ],
+                                icon: const Icon(Icons.more_vert),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-
-                  // 썸네일 (확장 상태면 안 보임)
-                  if (!isExpanded)
-                    StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('boards')
-                          .doc(post['boardId'])
-                          .collection('boardFiles')
-                          .orderBy('isThumbNail', descending: true)
-                          .snapshots(),
-                      builder: (context, snap) {
-                        if (snap.hasData && snap.data!.docs.isNotEmpty) {
-                          final images = snap.data!.docs.map((e) => e['filePath'] as String).toList();
-                          return Column(
-                            children: [
-                              SizedBox(
-                                height: 250,
-                                child: PageView.builder(
-                                  controller: _pageController,
-                                  itemCount: images.length,
-                                  itemBuilder: (context, index) {
-                                    return Image.network(images[index], fit: BoxFit.cover, width: double.infinity);
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              SmoothPageIndicator(
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('boards')
+                        .doc(post['boardId'])
+                        .collection('boardFiles')
+                        .orderBy('isThumbNail', descending: true)
+                        .snapshots(),
+                    builder: (context, snap) {
+                      if (snap.hasData && snap.data!.docs.isNotEmpty) {
+                        final images = snap.data!.docs.map((e) => e['filePath'] as String).toList();
+                        return Column(
+                          children: [
+                            SizedBox(
+                              height: 250,
+                              child: PageView.builder(
                                 controller: _pageController,
-                                count: images.length,
-                                effect: const ScrollingDotsEffect(
-                                  activeDotColor: Colors.black,
-                                  dotColor: Colors.grey,
-                                  dotHeight: 8,
-                                  dotWidth: 8,
-                                ),
+                                itemCount: images.length,
+                                itemBuilder: (context, index) {
+                                  return Image.network(images[index], fit: BoxFit.cover, width: double.infinity);
+                                },
                               ),
-                            ],
-                          );
-                        } else {
-                          return const SizedBox.shrink();
-                        }
-                      },
-                    ),
+                            ),
+                            const SizedBox(height: 8),
+                            SmoothPageIndicator(
+                              controller: _pageController,
+                              count: images.length,
+                              effect: const ScrollingDotsEffect(
+                                activeDotColor: Colors.black,
+                                dotColor: Colors.grey,
+                                dotHeight: 8,
+                                dotWidth: 8,
+                              ),
+                            ),
+                          ],
+                        );
+                      } else {
+                        return const SizedBox.shrink();
+                      }
+                    },
+                  ),
 
-                  // 제목 + 내용 + 좋아요
                   Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         StreamBuilder<DocumentSnapshot>(
-                          stream: likeDoc.snapshots(),
-                          builder: (context, snapshot) {
-                            final isLiked = snapshot.data?.exists ?? false;
-                            final likeCount = post['likeCount'] ?? 0;
+                          stream: boardDoc.snapshots(),  // boardDoc에서 실시간 데이터 감시
+                          builder: (context, boardSnapshot) {
+                            final boardData = boardSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+                            final likeCount = boardData['likeCount'] ?? 0;
 
-                            return Column(
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    isLiked ? Icons.favorite : Icons.favorite_border,
-                                    color: isLiked ? const Color(0xFFF45050) : Colors.grey,
-                                  ),
-                                  onPressed: () async {
-                                    final boardSnapshot = await boardDoc.get();
-                                    final currentCount = boardSnapshot.data()?['likeCount'] ?? 0;
+                            return StreamBuilder<DocumentSnapshot>(
+                              stream: likeDoc.snapshots(),
+                              builder: (context, snapshot) {
+                                final isLiked = snapshot.data?.exists ?? false;
 
-                                    if (isLiked) {
-                                      await likeDoc.delete();
-                                      await boardDoc.update({'likeCount': currentCount - 1});
-                                    } else {
-                                      await likeDoc.set({'likedAt': FieldValue.serverTimestamp()});
-                                      await boardDoc.update({'likeCount': currentCount + 1});
-                                    }
-                                  },
-                                ),
-                                Text('$likeCount', style: const TextStyle(fontSize: 12)),
-                              ],
+                                return Column(
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        isLiked ? Icons.favorite : Icons.favorite_border,
+                                        color: isLiked ? const Color(0xFFF45050) : Colors.grey,
+                                      ),
+                                      onPressed: () async {
+                                        if (isLiked) {
+                                          await likeDoc.delete();
+                                          await boardDoc.update({'likeCount': FieldValue.increment(-1)});
+                                        } else {
+                                          await likeDoc.set({'likedAt': FieldValue.serverTimestamp()});
+                                          await boardDoc.update({'likeCount': FieldValue.increment(1)});
+
+                                          if (post['userId'] != userId) {
+                                            final myDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+                                            final myNick = myDoc.data()?['nickName'] ?? '익명';
+
+                                            await FirebaseFirestore.instance
+                                                .collection('users')
+                                                .doc(post['userId'])
+                                                .collection('notifications')
+                                                .add({
+                                              'notiType': 'like',
+                                              'notiMsg': '$myNick 님이 좋아요를 눌렀습니다',
+                                              'boardId': post['boardId'],
+                                              'isRead': false,
+                                              'createdAt': FieldValue.serverTimestamp(),
+                                            });
+                                          }
+                                        }
+                                      },
+                                    ),
+                                    Text('$likeCount', style: const TextStyle(fontSize: 12)),
+                                  ],
+                                );
+                              },
                             );
                           },
                         ),
@@ -239,16 +414,18 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                               Text(post['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
                               const SizedBox(height: 6),
                               AnimatedCrossFade(
-                                crossFadeState: isExpanded
-                                    ? CrossFadeState.showSecond
-                                    : CrossFadeState.showFirst,
+                                crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
                                 duration: const Duration(milliseconds: 300),
-                                firstChild: Text(
-                                  post['content'] ?? '',
+                                firstChild: Linkify(
+                                  text: post['content'] ?? '',
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
+                                  onOpen: _onOpenLink,
                                 ),
-                                secondChild: Text(post['content'] ?? ''),
+                                secondChild: Linkify(
+                                  text: post['content'] ?? '',
+                                  onOpen: _onOpenLink,
+                                ),
                               ),
                               const SizedBox(height: 6),
                               GestureDetector(
@@ -264,7 +441,6 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                       ],
                     ),
                   ),
-                  // 댓글 미리보기
                   StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('boards')
