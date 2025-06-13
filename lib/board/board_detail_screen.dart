@@ -75,7 +75,6 @@ class BoardDetailScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('게시글', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: Colors.white,
-        automaticallyImplyLeading: false,
         elevation: 0,
       ),
       body: Stack(
@@ -139,15 +138,54 @@ class BoardDetailScreen extends StatelessWidget {
                                           isLiked ? Icons.favorite : Icons.favorite_border,
                                           color: isLiked ? const Color(0xFFF45050) : Colors.grey,
                                         ),
-                                        onPressed: () async {
-                                          if (isLiked) {
-                                            await likeDoc.delete();
-                                            await boardDoc.update({'likeCount': FieldValue.increment(-1)});
-                                          } else {
-                                            await likeDoc.set({'likedAt': FieldValue.serverTimestamp()});
-                                            await boardDoc.update({'likeCount': FieldValue.increment(1)});
+                                          onPressed: () async {
+                                            if (isLiked) {
+                                              await likeDoc.delete();
+                                              await boardDoc.update({'likeCount': FieldValue.increment(-1)});
+                                            } else {
+                                              await likeDoc.set({'likedAt': FieldValue.serverTimestamp()});
+                                              await boardDoc.update({'likeCount': FieldValue.increment(1)});
+
+                                              // 알림 전송
+                                              final currentUser = FirebaseAuth.instance.currentUser;
+                                              final receiverUid = data['userId'];
+
+                                              if (currentUser != null && receiverUid != currentUser.uid) {
+                                                // 수신자 알림 설정 확인
+                                                final notiSettingSnap = await FirebaseFirestore.instance
+                                                    .collection('users')
+                                                    .doc(receiverUid)
+                                                    .collection('notiSettings')
+                                                    .doc('main')
+                                                    .get();
+
+                                                final notiSettings = notiSettingSnap.data();
+                                                final isLikeEnabled = notiSettings?['like'] ?? true;
+
+                                                if (isLikeEnabled) {
+                                                  // 현재 사용자 nickName 불러오기
+                                                  final userDoc = await FirebaseFirestore.instance
+                                                      .collection('users')
+                                                      .doc(currentUser.uid)
+                                                      .get();
+
+                                                  final nickName = userDoc.data()?['nickName'] ?? '익명';
+
+                                                  await FirebaseFirestore.instance
+                                                      .collection('users')
+                                                      .doc(receiverUid)
+                                                      .collection('notifications')
+                                                      .add({
+                                                    'notiType': 'like',
+                                                    'notiMsg': '$nickName님이 게시글을 좋아합니다.',
+                                                    'boardId': boardId,
+                                                    'createdAt': FieldValue.serverTimestamp(),
+                                                    'isRead': false,
+                                                  });
+                                                }
+                                              }
+                                            }
                                           }
-                                        },
                                       ),
                                     ],
                                   );

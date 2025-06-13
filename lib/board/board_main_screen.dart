@@ -458,13 +458,21 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                                 final isLikeEnabled = notiSettings?['like'] ?? false;
 
                                                 if (isLikeEnabled) {
+                                                  // Firestore에서 내 닉네임 불러오기
+                                                  final userDoc = await FirebaseFirestore.instance
+                                                      .collection('users')
+                                                      .doc(currentUser.uid)
+                                                      .get();
+
+                                                  final nickName = userDoc.data()?['nickName'] ?? '익명';
+
                                                   await FirebaseFirestore.instance
                                                       .collection('users')
                                                       .doc(receiverUid)
                                                       .collection('notifications')
                                                       .add({
                                                     'notiType': 'like',
-                                                    'notiMsg': '${currentUser.displayName ?? "익명"}님이 게시글을 좋아합니다.',
+                                                    'notiMsg': '$nickName님이 게시글을 좋아합니다.',
                                                     'boardId': post['boardId'],
                                                     'createdAt': FieldValue.serverTimestamp(),
                                                     'isRead': false,
