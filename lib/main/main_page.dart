@@ -17,8 +17,9 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
-  DateTime _focusedDay = DateTime(2025, 6, 5);
+  DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  Key _calendarRefreshKey = UniqueKey(); // 달력 갱신용
 
   //final prefs = await SharedPreferences.getInstance();  위쪽 import랑 이거 두 줄 쓰면 SharedPreference로 저장된 로그인 id 불러올 수 있음
   //final userId = prefs.getString('userId');
@@ -34,6 +35,13 @@ class _MainPageState extends State<MainPage> {
       _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
     });
   }
+
+  void _refreshCalendar() {  // 키를 바꿔서 달력 위젯을 갱신하도록 함
+    setState(() {
+      _calendarRefreshKey = UniqueKey();
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -90,23 +98,38 @@ class _MainPageState extends State<MainPage> {
                   Divider(thickness: 1),
                   Expanded(
                     child: RoutineCalendar(
+                      key: _calendarRefreshKey,
                       focusedDay: _focusedDay,
                       selectedDay: _selectedDay,
-                      onDaySelected: (selectedDay, focusedDay) {
+                      onDaySelected: (selectedDay, focusedDay) async {
                         setState(() {
                           _selectedDay = selectedDay;
                           _focusedDay = focusedDay;
                         });
 
-                        Navigator.push(
+                        final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => RoutineDetailPage(date: selectedDay),
                           ),
-                        );
+                        ).then((value) {
+                          if (value == true) {
+                            setState(() {
+                              _calendarRefreshKey = UniqueKey();
+                            });
+                          }
+                        });
+
+
+                        if (result == true) {
+                          setState(() {
+                            _calendarRefreshKey = UniqueKey();
+                          });
+                        }
                       },
                     ),
                   ),
+
                 ],
               ),
             ),

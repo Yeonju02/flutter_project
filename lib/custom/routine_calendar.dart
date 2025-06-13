@@ -8,7 +8,7 @@ class RoutineCalendar extends StatefulWidget {
   final DateTime? selectedDay;
   final void Function(DateTime selectedDay, DateTime focusedDay) onDaySelected;
 
-  const RoutineCalendar({
+  RoutineCalendar({
     super.key,
     required this.focusedDay,
     required this.selectedDay,
@@ -21,10 +21,14 @@ class RoutineCalendar extends StatefulWidget {
 
 class _RoutineCalendarState extends State<RoutineCalendar> {
   Map<DateTime, List<String>> _events = {};
+  late DateTime _focusedDay;
+  DateTime? _selectedDay;
 
   @override
   void initState() {
     super.initState();
+    _focusedDay = widget.focusedDay;
+    _selectedDay = widget.selectedDay;
     _loadEvents();
   }
 
@@ -65,11 +69,20 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
 
     setState(() {
       _events = eventMap;
+      _selectedDay ??= _focusedDay; // 초기 진입 시 루틴 보이게
     });
   }
 
   List<String> _getEventsForDay(DateTime day) {
     return _events[DateTime.utc(day.year, day.month, day.day)] ?? [];
+  }
+
+  void _handleDaySelected(DateTime selectedDay, DateTime focusedDay) {
+    setState(() {
+      _selectedDay = selectedDay;
+      _focusedDay = focusedDay;
+    });
+    widget.onDaySelected(selectedDay, focusedDay);
   }
 
   @override
@@ -80,11 +93,11 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
           headerVisible: false,
           firstDay: DateTime.utc(2020, 1, 1),
           lastDay: DateTime.utc(2030, 12, 31),
-          focusedDay: widget.focusedDay,
-          selectedDayPredicate: (day) => isSameDay(widget.selectedDay, day),
-          onDaySelected: widget.onDaySelected,
+          focusedDay: _focusedDay,
+          selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+          onDaySelected: _handleDaySelected,
           eventLoader: _getEventsForDay,
-          calendarStyle: const CalendarStyle(
+          calendarStyle: CalendarStyle(
             markerDecoration: BoxDecoration(
               color: Colors.lightBlue,
               shape: BoxShape.circle,
@@ -98,7 +111,7 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
                   child: Container(
                     width: 6,
                     height: 6,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.lightBlue,
                     ),
@@ -111,7 +124,7 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
         ),
         Divider(thickness: 2, color: Colors.grey),
         SizedBox(height: 8),
-        ..._getEventsForDay(widget.selectedDay ?? widget.focusedDay).map(
+        ..._getEventsForDay(_selectedDay ?? _focusedDay).map(
               (event) => Padding(
             padding: EdgeInsets.symmetric(horizontal: 40, vertical: 18),
             child: Row(
@@ -121,9 +134,7 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
                 SizedBox(width: 14),
                 Text(
                   event,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],

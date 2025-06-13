@@ -149,7 +149,7 @@ class _RoutineEditDialogState extends State<RoutineEditDialog> {
         }
       }
 
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     } catch (e) {
       print('루틴 수정 실패: $e');
     }
@@ -164,7 +164,8 @@ class _RoutineEditDialogState extends State<RoutineEditDialog> {
           .collection('routineLogs')
           .doc(widget.routineDocId)
           .delete();
-      Navigator.pop(context);
+
+      Navigator.pop(context, true);
     } catch (e) {
       print('루틴 삭제 실패: $e');
     }
