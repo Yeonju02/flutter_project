@@ -7,7 +7,7 @@ class ReportListScreen extends StatelessWidget {
   Future<void> deleteBoardCompletely(String boardId) async {
     final boardRef = FirebaseFirestore.instance.collection('boards').doc(boardId);
 
-    // 1. 하위 컬렉션 삭제 함수
+    // 하위 컬렉션 삭제 (신고 reports는 삭제 x)
     Future<void> deleteSubCollection(String subPath) async {
       final subCollection = await boardRef.collection(subPath).get();
       for (var doc in subCollection.docs) {
@@ -15,29 +15,28 @@ class ReportListScreen extends StatelessWidget {
       }
     }
 
-    // 2. 하위 컬렉션 삭제
     await deleteSubCollection('comments');
     await deleteSubCollection('likes');
-    await deleteSubCollection('reports');
+    // await deleteSubCollection('reports');
 
-    // 3. 게시글 문서 삭제
-    await boardRef.delete();
+    await boardRef.delete(); // 게시글 문서 삭제
   }
 
   Future<void> markAsResolved(String boardId, String reportId) async {
-    // 게시글 완전 삭제
+    final resolvedAt = Timestamp.now();
+
+    // 게시글만 삭제
     await deleteBoardCompletely(boardId);
 
-    // 해결 표시 남기기 (Firestore에서 report 삭제 대신 상태 업데이트)
-    final resolvedAt = Timestamp.now();
+    // 신고 문서 상태만 업데이트 (삭제 X)
     await FirebaseFirestore.instance
-        .collection('resolvedReports')
+        .collection('boards')
+        .doc(boardId)
+        .collection('reports')
         .doc(reportId)
-        .set({
-      'boardId': boardId,
-      'reportId': reportId,
+        .update({
+      'isResolved': true,
       'resolvedAt': resolvedAt,
-      'status': 'resolved',
     });
   }
 
@@ -63,13 +62,31 @@ class ReportListScreen extends StatelessWidget {
                     .orderBy('createdAt', descending: true)
                     .snapshots(),
                 builder: (context, reportSnap) {
-                  if (!reportSnap.hasData || reportSnap.data!.docs.isEmpty) return const SizedBox();
+                  if (!reportSnap.hasData) return const SizedBox();
 
-                  final reports = reportSnap.data!.docs;
+                  final now = DateTime.now();
+                  final List<QueryDocumentSnapshot> reportsToShow = [];
+
+                  for (var doc in reportSnap.data!.docs) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final isResolved = data['isResolved'] == true;
+                    final resolvedAt = data['resolvedAt'];
+
+                    // 삭제 조건: 해결된 지 24시간 지난 경우 → 삭제만 하고 continue 하지 않음
+                    if (isResolved && resolvedAt is Timestamp) {
+                      final resolvedTime = resolvedAt.toDate();
+                      if (now.difference(resolvedTime).inHours >= 24) {
+                        doc.reference.delete(); // 삭제만 수행
+                      }
+                    }
+                    reportsToShow.add(doc);
+                  }
+
+                  if (reportsToShow.isEmpty) return const SizedBox();
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: reports.map((reportDoc) {
+                    children: reportsToShow.map((reportDoc) {
                       final report = reportDoc.data() as Map<String, dynamic>;
                       final isResolved = report['isResolved'] == true;
                       final createdAt = report['createdAt'];
@@ -85,7 +102,14 @@ class ReportListScreen extends StatelessWidget {
                             '신고자: ${report['reporterId']}\n시간: $createdAtText',
                           ),
                           trailing: isResolved
-                              ? const Icon(Icons.check_circle, color: Colors.green)
+                              ? Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.check_circle, color: Colors.green),
+                              SizedBox(height: 4),
+                              Text('해결됨', style: TextStyle(fontSize: 10, color: Colors.green)),
+                            ],
+                          )
                               : ElevatedButton(
                             onPressed: () => markAsResolved(boardId, reportDoc.id),
                             child: const Text('해결'),
