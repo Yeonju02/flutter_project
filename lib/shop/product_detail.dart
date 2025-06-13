@@ -67,8 +67,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final product = widget.data;
 
     return Scaffold(
+      backgroundColor : Colors.white,
       appBar: AppBar(
-        title: const Text('상세정보'),
+        title: const Text('상세정보', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
+        backgroundColor: Colors.white,
         leading: const BackButton(),
       ),
       bottomNavigationBar: Container(
@@ -110,7 +112,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[200],
+                    backgroundColor: Color(0xFFE0E0E0),
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -139,7 +141,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   icon: const Icon(Icons.payment),
                   label: const Text('주문하기'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
+                    backgroundColor: Color(0xFF92BBE2),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -204,7 +206,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     const Icon(Icons.star, color: Colors.amber, size: 18),
                     const SizedBox(width: 4),
                     Text('별점 ${avg.toStringAsFixed(1)}  (${docs.length} Reviews)',
-                        style: const TextStyle(fontSize: 14)),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                   ],
                 );
               },
@@ -314,7 +316,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                                 child: LinearProgressIndicator(
                                   value: percent / 100,
                                   backgroundColor: Colors.grey[300],
-                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.orange),
+                                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF92BBE2)),
                                   minHeight: 8,
                                 ),
                               ),
