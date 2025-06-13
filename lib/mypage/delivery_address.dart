@@ -558,150 +558,180 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: Text('배송지 관리',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text(
+          '배송지 관리',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(user!.uid)
-            .collection('address')
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData)
-            return Center(child: CircularProgressIndicator());
+      body: SizedBox.expand(
+        child: Stack(
+          children: [
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user!.uid)
+                  .collection('address')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return Center(child: CircularProgressIndicator());
+                }
 
-          final docs = snapshot.data!.docs;
-          final addresses = docs
-              .map((doc) =>
-          {
-            ...doc.data() as Map<String, dynamic>,
-            'docId': doc.id, // 각 문서의 ID 추가
-          })
-              .toList();
+                final docs = snapshot.data!.docs;
+                final addresses = docs
+                    .map((doc) => {
+                  ...doc.data() as Map<String, dynamic>,
+                  'docId': doc.id,
+                })
+                    .toList();
 
-          // 기본 배송지를 위로 정렬
-          addresses.sort((a, b) {
-            if (a['isDefault'] == true) return -1;
-            if (b['isDefault'] == true) return 1;
-            return 0;
-          });
+                // 기본 배송지 위로 정렬
+                addresses.sort((a, b) {
+                  if (a['isDefault'] == true) return -1;
+                  if (b['isDefault'] == true) return 1;
+                  return 0;
+                });
 
-          return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 80),
-            child: Column(
-              children: [
-                ...addresses.map((addr) {
-                  return GestureDetector(
-                    onTap: () async {
-                      await setDefaultAddress(addr['docId']);
-                    },
-                    child: Container(
-                      margin: EdgeInsets.only(bottom: 16),
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: addr['isDefault'] == true
-                              ? Colors.blueAccent
-                              : Colors.grey.shade300,
-                          width: 2,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(addr['name'], style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16)),
-                              if (addr['isDefault'] == true)
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                      '기본 배송지', style: TextStyle(fontSize: 12)),
-                                ),
-                            ],
-                          ),
-                          Divider(),
-                          Text('주소',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text('${addr['address']}'),
-                          SizedBox(height: 8),
-                          Text('전화번호',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text('${addr['phone']}'),
-
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              ElevatedButton(
-                                onPressed: () =>
-                                    showEditAddressDialog(addr, addr['docId']),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  elevation: 3,
-                                  padding: EdgeInsets.symmetric(
-                                      vertical: 14, horizontal: 24),
-                                ),
-                                child: Text('수정하기'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-
-                SizedBox(height: 10),
-
-                ElevatedButton(
-                  onPressed: showAddAddressDialog,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    elevation: 3,
-                    padding: EdgeInsets.symmetric(vertical: 14),
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 20,
                   ),
-                  child: Center(child: Text('배송지 추가하기')),
-                ),
-              ],
+                  child: Column(
+                    children: [
+                      ...addresses.map((addr) {
+                        return GestureDetector(
+                          onTap: () async {
+                            await setDefaultAddress(addr['docId']);
+                          },
+                          child: Container(
+                            margin: EdgeInsets.only(bottom: 16),
+                            padding: EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: addr['isDefault'] == true
+                                    ? Colors.blueAccent
+                                    : Colors.grey.shade300,
+                                width: 2,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      addr['name'],
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    if (addr['isDefault'] == true)
+                                      Container(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          border: Border.all(color: Colors.grey),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          '기본 배송지',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                Divider(),
+                                Text('주소',
+                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                                Text('${addr['address']}'),
+                                SizedBox(height: 8),
+                                Text('전화번호',
+                                    style: TextStyle(fontWeight: FontWeight.bold)),
+                                Text('${addr['phone']}'),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    ElevatedButton(
+                                      onPressed: () => showEditAddressDialog(
+                                          addr, addr['docId']),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.white,
+                                        foregroundColor: Colors.black,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(30),
+                                        ),
+                                        elevation: 3,
+                                        padding: EdgeInsets.symmetric(
+                                            vertical: 14, horizontal: 24),
+                                      ),
+                                      child: Text('수정하기'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: showAddAddressDialog,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          elevation: 3,
+                          padding: EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Center(child: Text('배송지 추가하기')),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: 4,
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.push(context,
-                MaterialPageRoute(builder: (context) => const ShopMainPage()));
-          } else if (index == 1) {
-            Navigator.push(context, MaterialPageRoute(
-                builder: (context) => const BoardMainScreen()));
-          } else if (index == 2) {
-            Navigator.push(context,
-                MaterialPageRoute(builder: (context) => const MainPage()));
-          } else if (index == 4) {
-            Navigator.push(context,
-                MaterialPageRoute(builder: (context) => const MyPage()));
-          }
-        },
+
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 30, // 너무 아래 붙지 않게
+              child: BottomNavBar(
+                currentIndex: 4,
+                onTap: (index) {
+                  if (index == 0) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ShopMainPage()),
+                    );
+                  } else if (index == 1) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const BoardMainScreen()),
+                    );
+                  } else if (index == 2) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MainPage()),
+                    );
+                  } else if (index == 4) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MyPage()),
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+
 }
