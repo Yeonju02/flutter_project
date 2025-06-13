@@ -13,34 +13,37 @@ class BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 70,
+      height: 90, // 전체 높이 증가
       child: Stack(
-        alignment: Alignment.center,
+        alignment: Alignment.topCenter,
         children: [
-          // 하단 배경
+          // 배경 바
           Positioned(
-            bottom: 0,
-            left: 16,
-            right: 16,
+            bottom: 10,
+            left: 20,
+            right: 20,
             child: Container(
-              height: 56,
+              height: 60,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(32),
+                borderRadius: BorderRadius.circular(40),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black12,
-                    blurRadius: 6,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
                   ),
                 ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: List.generate(5, (index) {
-                  if (index == 2) return const SizedBox(width: 48); // 홈 아이콘 공간 비우기
+                  if (index == 2) return const SizedBox(width: 60); // 홈 자리 비워두기
                   return IconButton(
-                    icon: Icon(_iconData(index),
-                        color: currentIndex == index ? Colors.black : Colors.grey),
+                    icon: Icon(
+                      _iconData(index),
+                      color: currentIndex == index ? Colors.black : Colors.grey,
+                    ),
                     onPressed: () => onTap?.call(index),
                   );
                 }),
@@ -48,21 +51,28 @@ class BottomNavBar extends StatelessWidget {
             ),
           ),
 
-          // 홈 아이콘
+          // 홈 버튼
           Positioned(
-            bottom: 15,
+            top: 0,
             child: GestureDetector(
               onTap: () => onTap?.call(2),
               child: Container(
-                width: 65,
-                height: 65,
+                width: 70,
+                height: 70,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.grey.shade300, width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Icon(
                   Icons.home,
+                  size: 30,
                   color: currentIndex == 2 ? Colors.black : Colors.grey,
                 ),
               ),

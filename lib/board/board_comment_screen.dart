@@ -1,18 +1,16 @@
-// 기존 import 그대로 유지
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class CommentScreen extends StatefulWidget {
+class CommentScreenBody extends StatefulWidget {
   final String boardId;
-
-  const CommentScreen({super.key, required this.boardId});
+  const CommentScreenBody({super.key, required this.boardId});
 
   @override
-  State<CommentScreen> createState() => _CommentScreenState();
+  State<CommentScreenBody> createState() => _CommentScreenState();
 }
 
-class _CommentScreenState extends State<CommentScreen> {
+class _CommentScreenState extends State<CommentScreenBody> {
   final TextEditingController _commentController = TextEditingController();
   final user = FirebaseAuth.instance.currentUser;
 
@@ -37,7 +35,7 @@ class _CommentScreenState extends State<CommentScreen> {
     final content = _commentController.text.trim();
     if (content.isEmpty || user == null || myNickName == null) return;
 
-    final commentRef = await FirebaseFirestore.instance
+    await FirebaseFirestore.instance
         .collection('boards')
         .doc(widget.boardId)
         .collection('comments')
@@ -55,20 +53,31 @@ class _CommentScreenState extends State<CommentScreen> {
         .get();
 
     final boardOwnerId = boardDoc.data()?['userId'];
-
     if (boardOwnerId != null && boardOwnerId != user!.uid) {
-
-      await FirebaseFirestore.instance
+      // 댓글 알림 설정 여부 확인
+      final settingSnap = await FirebaseFirestore.instance
           .collection('users')
           .doc(boardOwnerId)
-          .collection('notifications')
-          .add({
-        'notiType': 'comment',
-        'notiMsg': '$myNickName 님이 댓글을 남겼습니다',
-        'boardId': widget.boardId,
-        'isRead': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+          .collection('notiSettings')
+          .doc('main')
+          .get();
+
+      final settings = settingSnap.data();
+      final isCommentEnabled = settings?['comment'] ?? false;
+
+      if (isCommentEnabled) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(boardOwnerId)
+            .collection('notifications')
+            .add({
+          'notiType': 'comment',
+          'notiMsg': '$myNickName 님이 댓글을 남겼습니다',
+          'boardId': widget.boardId,
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
     }
 
     setState(() {
@@ -128,7 +137,7 @@ class _CommentScreenState extends State<CommentScreen> {
     final timeAgo = _formatTimeAgo(createdAt);
 
     return Padding(
-      padding: EdgeInsets.only(left: 16.0 * indent, right: 8, bottom: 8),
+      padding: EdgeInsets.only(left: 32.0 * indent, right: 12, bottom: 5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -201,86 +210,78 @@ class _CommentScreenState extends State<CommentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('댓글'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.pop(context),
-          )
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('boards')
-                  .doc(widget.boardId)
-                  .collection('comments')
-                  .orderBy('createdAt', descending: false)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                final docs = snapshot.data!.docs;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('boards')
+              .doc(widget.boardId)
+              .collection('comments')
+              .orderBy('createdAt', descending: false)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+            final docs = snapshot.data!.docs;
 
-                Map<String, List<QueryDocumentSnapshot>> repliesMap = {};
-                List<QueryDocumentSnapshot> topLevel = [];
+            Map<String, List<QueryDocumentSnapshot>> repliesMap = {};
+            List<QueryDocumentSnapshot> topLevel = [];
 
-                for (var doc in docs) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final parentId = data['parentId'];
-                  if (parentId == null) {
-                    topLevel.add(doc);
-                  } else {
-                    repliesMap.putIfAbsent(parentId, () => []).add(doc);
-                  }
+            for (var doc in docs) {
+              final data = doc.data() as Map<String, dynamic>;
+              final parentId = data['parentId'];
+              if (parentId == null) {
+                topLevel.add(doc);
+              } else {
+                repliesMap.putIfAbsent(parentId, () => []).add(doc);
+              }
+            }
+
+            List<Widget> commentWidgets = [];
+            void addComments(List<QueryDocumentSnapshot> comments, {bool isTopLevel = false}) {
+              for (var doc in comments) {
+                final data = doc.data() as Map<String, dynamic>;
+                final createdAt = (data['createdAt'] as Timestamp).toDate();
+                final updatedAt = data['updatedAt'] != null ? (data['updatedAt'] as Timestamp).toDate() : null;
+                final isMine = myNickName != null && data['nickName'] == myNickName;
+
+                final indent = isTopLevel ? 0 : 1;
+
+                commentWidgets.add(_buildCommentTile(data, doc.id, indent, isMine, createdAt, updatedAt));
+                if (repliesMap.containsKey(doc.id)) {
+                  addComments(repliesMap[doc.id]!, isTopLevel: false);
                 }
+              }
+            }
 
-                List<Widget> commentWidgets = [];
-                void addComments(List<QueryDocumentSnapshot> comments, int indent) {
-                  for (var doc in comments) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final createdAt = (data['createdAt'] as Timestamp).toDate();
-                    final updatedAt = data['updatedAt'] != null ? (data['updatedAt'] as Timestamp).toDate() : null;
-                    final isMine = myNickName != null && data['nickName'] == myNickName;
-
-                    commentWidgets.add(_buildCommentTile(data, doc.id, indent, isMine, createdAt, updatedAt));
-                    if (repliesMap.containsKey(doc.id)) {
-                      addComments(repliesMap[doc.id]!, indent + 1);
-                    }
-                  }
-                }
-
-                addComments(topLevel, 0);
-                return ListView(children: commentWidgets);
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    decoration: const InputDecoration(
-                      hintText: '댓글을 입력하세요...',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
+            addComments(topLevel, isTopLevel: true);
+            return ListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: commentWidgets,
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _commentController,
+                decoration: const InputDecoration(
+                  hintText: '댓글을 입력하세요...',
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _submitComment,
-                  child: const Text('등록'),
-                )
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: _submitComment,
+              child: const Text('등록'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

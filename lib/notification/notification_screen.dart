@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:routinelogapp/board/board_detail_screen.dart';
+import '../custom/bottom_nav_bar.dart';
+import '../main/main_page.dart';
+import '../mypage/myPage_main.dart';
+import '../shop/shop_main.dart';
+import '../board/board_main_screen.dart';
 
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
@@ -11,50 +17,82 @@ class NotificationScreen extends StatelessWidget {
     if (user == null) return const Scaffold(body: Center(child: Text("로그인이 필요합니다.")));
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('알림'),
+        title: const Text('알림', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+        elevation: 0,
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('notifications')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      body: Stack(
+        children: [
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .collection('notifications')
+                .orderBy('createdAt', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-          final notifications = snapshot.data!.docs;
+              final notifications = snapshot.data!.docs;
+              final now = DateTime.now();
+              final List<DocumentSnapshot> recent = [];
+              final List<DocumentSnapshot> older = [];
 
-          final now = DateTime.now();
-          final List<DocumentSnapshot> recent = [];
-          final List<DocumentSnapshot> older = [];
+              for (var doc in notifications) {
+                final createdAt = (doc['createdAt'] as Timestamp).toDate();
+                if (now.difference(createdAt).inDays <= 7) {
+                  recent.add(doc);
+                } else {
+                  older.add(doc);
+                }
+              }
 
-          for (var doc in notifications) {
-            final createdAt = (doc['createdAt'] as Timestamp).toDate();
-            if (now.difference(createdAt).inDays <= 7) {
-              recent.add(doc);
-            } else {
-              older.add(doc);
-            }
-          }
-
-          return ListView(
-            children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Text('최근 7일', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-              ...recent.map((doc) => _buildNotificationTile(context, doc)),
-
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
-                child: Text('지난 알림', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-              ...older.map((doc) => _buildNotificationTile(context, doc)),
-            ],
-          );
-        },
+              return ListView(
+                padding: const EdgeInsets.only(bottom: 100),
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text('최근 7일', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  ...recent.map((doc) => _buildNotificationTile(context, doc)),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
+                    child: Text('지난 알림', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  ...older.map((doc) => _buildNotificationTile(context, doc)),
+                ],
+              );
+            },
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: BottomNavBar(
+              currentIndex: 3,
+              onTap: (index) {
+                if (index == 0) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopMainPage()));
+                }
+                if (index == 1) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardMainScreen()));
+                }
+                if (index == 2) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const MainPage()));
+                }
+                if (index == 3) {
+                  // 현재 페이지
+                }
+                if (index == 4) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const MyPageMain()));
+                }
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -68,10 +106,21 @@ class NotificationScreen extends StatelessWidget {
     final createdAt = (data['createdAt'] as Timestamp).toDate();
 
     return InkWell(
-      onTap: () {
-        // 알림 클릭 시 게시글 상세 페이지로 이동
+      onTap: () async {
         if (boardId != null && (notiType == 'like' || notiType == 'comment')) {
-          Navigator.pushNamed(context, '/post/$boardId');
+          // 알림을 읽음 처리
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(FirebaseAuth.instance.currentUser!.uid)
+              .collection('notifications')
+              .doc(doc.id)
+              .update({'isRead': true});
+
+          // 게시글 상세로 이동
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => BoardDetailScreen(boardId: boardId)),
+          );
         }
       },
       child: Container(
