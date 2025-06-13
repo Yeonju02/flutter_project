@@ -28,7 +28,17 @@ class RoutineBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color selectedColor = Color(0xFF92BBE2);
+    final Color baseColor = Colors.grey.shade100;
+    final Color blueColor = Color(0xFF92BBE2);
+    final Color redColor = Color(0xFFFFCCCC);
+
+    final int xpEarned = routineData['xpEarned'] ?? 0;
+
+    final bgColor = isChecked
+        ? (xpEarned > 0 ? blueColor : redColor)
+        : baseColor;
+
+    final textColor = isChecked ? Colors.white : Colors.black;
 
     return GestureDetector(
       onTap: onEdit,
@@ -38,7 +48,7 @@ class RoutineBox extends StatelessWidget {
         margin: EdgeInsets.only(bottom: 12),
         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: isChecked ? selectedColor : Colors.grey.shade100,
+          color: bgColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -47,7 +57,7 @@ class RoutineBox extends StatelessWidget {
               '$startTime ~ $endTime',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: isChecked ? Colors.white : Colors.black,
+                color: textColor,
               ),
             ),
             SizedBox(width: 12),
@@ -56,30 +66,32 @@ class RoutineBox extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontSize: 16,
-                  color: isChecked ? Colors.white : Colors.black,
+                  color: textColor,
                 ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             GestureDetector(
-              onTap: onToggle,
+              onTap: isChecked ? null : onToggle,
               child: Container(
                 width: 22,
                 height: 22,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white,
                 ),
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
+                  duration: Duration(milliseconds: 300),
                   transitionBuilder: (child, animation) {
                     return ScaleTransition(scale: animation, child: child);
                   },
                   child: isChecked
-                      ? Icon(Icons.check, key: const ValueKey('checked'), size: 18, color: selectedColor)
-                      : const Icon(Icons.circle_outlined, key: ValueKey('unchecked'), size: 18, color: Colors.grey),
+                      ? (xpEarned > 0
+                      ? Icon(Icons.check, key: ValueKey('check'), size: 18, color: blueColor)
+                      : Icon(Icons.close, key: ValueKey('close'), size: 18, color: Colors.red))
+                      : Icon(Icons.circle_outlined, key: ValueKey('none'), size: 18, color: Colors.grey),
                 ),
               ),
             ),

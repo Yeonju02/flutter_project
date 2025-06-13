@@ -5,9 +5,6 @@ import 'package:flutter_switch/flutter_switch.dart';
 import 'daily_routine.dart';
 import '../custom/custom_blue_button.dart';
 import 'new_routine.dart';
-import '../custom/bottom_nav_bar.dart';
-import '../shop/shop_main.dart';
-import '../board/board_main_screen.dart';
 
 class RoutineDetailPage extends StatefulWidget {
   final DateTime date;
@@ -15,12 +12,13 @@ class RoutineDetailPage extends StatefulWidget {
   const RoutineDetailPage({super.key, required this.date});
 
   @override
-  State<RoutineDetailPage> createState() => _RoutineDetailPageState();
+  State<RoutineDetailPage> createState() => RoutineDetailPageState();
 }
 
-class _RoutineDetailPageState extends State<RoutineDetailPage> {
+class RoutineDetailPageState extends State<RoutineDetailPage> {
   late DateTime selectedDate;
   bool isDayMode = false;
+  final GlobalKey<DateSliderState> sliderKey = GlobalKey();
 
   @override
   void initState() {
@@ -37,11 +35,11 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
 
             // 연/월 + 뒤로가기 + 스위치
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -49,25 +47,25 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.arrow_back),
-                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => Navigator.pop(context, true),
                         padding: EdgeInsets.zero,
-                        constraints: BoxConstraints(),
+                        constraints: const BoxConstraints(),
                       ),
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
                       Text(
                         '${selectedDate.year}',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                       ),
                       Text(
                         selectedDate.month.toString().padLeft(2, '0'),
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
-                  Spacer(),
+                  const Spacer(),
                   Padding(
-                    padding: EdgeInsets.only(top: 40.0),
+                    padding: const EdgeInsets.only(top: 40.0),
                     child: FlutterSwitch(
                       width: 60,
                       height: 30,
@@ -89,10 +87,11 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // 날짜 슬라이더
             DateSlider(
+              key: sliderKey,
               initialDate: selectedDate,
               onDateSelected: (newDate) {
                 setState(() {
@@ -101,25 +100,30 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
               },
             ),
 
-            SizedBox(height: 20),
-            Divider(thickness: 1.2),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
+            const Divider(thickness: 1.2),
+            const SizedBox(height: 20),
 
             // 루틴 리스트
-            Expanded(child: DailyRoutine(selectedDate: selectedDate,routineType: isDayMode ? 'night' : 'morning',)),
-
-            Divider(thickness: 1.2),
-            SizedBox(height: 20),
+            Expanded(
+              child: DailyRoutine(
+                key: UniqueKey(), // 매번 새로 갱신되도록
+                selectedDate: selectedDate,
+                routineType: isDayMode ? 'night' : 'morning',
+              ),
+            ),
+            const Divider(thickness: 1.2),
+            const SizedBox(height: 20),
 
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: CustomBlueButton(
                 text: '루틴 추가하기',
-                onPressed: () {
-                  showModalBottomSheet(
+                onPressed: () async {
+                  final result = await showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
-                    shape: RoundedRectangleBorder(
+                    shape: const RoundedRectangleBorder(
                       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                     ),
                     builder: (context) => Padding(
@@ -129,11 +133,15 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
                       child: NewRoutineSheet(selectedDate: selectedDate),
                     ),
                   );
+
+                  if (result == true) {
+                    setState(() {}); // DailyRoutine 갱신
+                    sliderKey.currentState?.refresh();
+                  }
                 },
               ),
             ),
-            SizedBox(height: 100),
-
+            const SizedBox(height: 100),
           ],
         ),
       ),

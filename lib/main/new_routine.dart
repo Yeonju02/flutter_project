@@ -391,8 +391,7 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                     .collection('routineLogs')
                     .add(routineData);
 
-                print('루틴 저장 완료 (문서 ID: $userDocId)');
-                Navigator.pop(context);
+                Navigator.pop(context, true);
               } catch (e) {
                 print('저장 중 오류 발생: $e');
               }
