@@ -90,16 +90,32 @@ class PortPay extends StatelessWidget {
                   final snapshot = await transaction.get(productRef);
                   if (!snapshot.exists) throw Exception('상품이 존재하지 않습니다.');
 
-                  final stockMap = Map<String, dynamic>.from(snapshot['stock']);
-                  final currentStock = stockMap[selectedColor];
+                  final colors = List<Map<String, dynamic>>.from(snapshot['colors']);
+                  final colorItem = colors.firstWhere(
+                        (c) => c['color'].toString().toLowerCase() == selectedColor,
+                    orElse: () => {},
+                  );
+
+                  final currentStock = colorItem['stock'] ?? 0;
 
                   if (currentStock == null || currentStock < quantity) {
                     throw Exception('선택한 색상의 재고가 부족합니다.');
                   }
 
+                  final updatedColors = colors.map((colorItem) {
+                    if (colorItem['color'].toString().toLowerCase() == selectedColor) {
+                      return {
+                        ...colorItem,
+                        'stock': (colorItem['stock'] ?? 0) - quantity,
+                      };
+                    }
+                    return colorItem;
+                  }).toList();
+
                   transaction.update(productRef, {
-                    'stock.$selectedColor': currentStock - quantity,
+                    'colors': updatedColors,
                   });
+
                 });
               } catch (e) {
                 await showDialog(
@@ -120,23 +136,6 @@ class PortPay extends StatelessWidget {
                 );
                 return;
               }
-
-              final orderItem = {
-                'productId': productId,
-                'productName': product['productName'],
-                'productPrice': product['productPrice'],
-                'selectedColor': selectedColorRaw,
-                'quantity': quantity,
-                'status': '결제완료',
-                'orderId': orderId,
-                'orderedAt': now,
-                'account': '',
-              };
-
-              print("🔥 저장할 주문 정보: $orderItem");
-
-              await userRef.collection('orders').add(orderItem);
-
 
               await userRef.collection('orders').add({
                 'productId': productId,
