@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../board/board_main_screen.dart';
-import '../custom/routine_calendar.dart';
 import '../main/main_page.dart';
 import '../mypage/myPage_main.dart';
 import '../notification/notification_screen.dart';
@@ -22,9 +21,7 @@ class _ShopMainPageState extends State<ShopMainPage> {
   String selectedSubCategory = '';
   String searchText = '';
   bool _isLoading = false;
-  List<DocumentSnapshot> _displayedProducts = [];
-  String _pendingMainCategory = '';
-  String _pendingSubCategory = '';
+  List<Map<String, dynamic>> _displayedProducts = [];
   int _currentIndex = 0;
 
   // 예시 카테고리 맵
@@ -195,12 +192,12 @@ class _ShopMainPageState extends State<ShopMainPage> {
                       return const Center(child: CircularProgressIndicator());
                     }
 
-                    // 모든 상품 받아오기
                     final allProducts = snapshot.data!.docs;
 
-                    // 👉 필터링된 상품 리스트 임시 저장
+                    // 👉 필터링된 상품 리스트 임시 저장 (각 데이터에 productId 포함)
                     final filtered = allProducts.where((doc) {
                       final data = doc.data() as Map<String, dynamic>;
+                      data['productId'] = doc.id; // 🔸 문서 ID 추가
                       final name = data['productName']?.toString() ?? '';
                       final category = data['productCategory'] ?? {};
                       final main = category['main'] ?? '';
@@ -211,6 +208,10 @@ class _ShopMainPageState extends State<ShopMainPage> {
                       final matchesSearch = name.contains(searchText);
 
                       return matchesMain && matchesSub && matchesSearch;
+                    }).map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      data['productId'] = doc.id;
+                      return data; // 🔄 data만 리스트에 담음
                     }).toList();
 
                     // ✅ 최초 한 번만 표시하거나 로딩이 끝난 후 교체
@@ -228,7 +229,7 @@ class _ShopMainPageState extends State<ShopMainPage> {
                       ),
                       itemCount: _displayedProducts.length,
                       itemBuilder: (context, index) {
-                        final data = _displayedProducts[index].data() as Map<String, dynamic>;
+                        final data = _displayedProducts[index];
                         return ProductCard(
                           data: data,
                           onTap: () {
@@ -387,17 +388,21 @@ class _ProductCardState extends State<ProductCard> {
   Widget build(BuildContext context) {
     final data = widget.data;
     final formatter = NumberFormat('#,###');
-    final stock = data['stock'] ?? 0;
 
-    final isSoldOut = stock == 0;
+    final List colors = data['colors'] ?? [];
+    final firstColor = colors.isNotEmpty ? Map<String, dynamic>.from(colors[0]) : null;
+    final stock = colors.fold<int>(0, (sum, item) {
+      final s = item['stock'];
+      return sum + (s is int ? s : (s is double ? s.toInt() : 0));
+    });
+    final isSoldOut = data['isSoldOut'] == true;
 
     return GestureDetector(
-      onTap: isSoldOut ? null : widget.onTap, // 품절이면 탭 막기
+      onTap: isSoldOut ? null : widget.onTap,
       child: Opacity(
         opacity: isSoldOut ? 0.5 : 1.0,
         child: Stack(
           children: [
-            // 기본 카드 UI
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
@@ -420,13 +425,13 @@ class _ProductCardState extends State<ProductCard> {
                     decoration: BoxDecoration(
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                       image: DecorationImage(
-                        image: AssetImage(data['imgPath']),
+                        image: firstColor != null && firstColor['imgPath'] != null
+                            ? NetworkImage(firstColor['imgPath'])
+                            : const AssetImage('assets/no_image.png') as ImageProvider,
                         fit: BoxFit.cover,
                       ),
                     ),
                   ),
-
-                  // 상품명
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     child: Text(
@@ -434,17 +439,12 @@ class _ProductCardState extends State<ProductCard> {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
-
-                  // 별점 + 재고
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Row(
                       children: [
                         const Icon(Icons.star, color: Colors.amber, size: 16),
-                        Text(
-                          '별점 ${avgRating.toStringAsFixed(1)}',
-                          style: const TextStyle(fontSize: 13),
-                        ),
+                        Text('별점 ${avgRating.toStringAsFixed(1)}', style: const TextStyle(fontSize: 13)),
                         const SizedBox(width: 6),
                         const Text('|', style: TextStyle(color: Colors.black54, fontSize: 16)),
                         const SizedBox(width: 6),
@@ -452,8 +452,6 @@ class _ProductCardState extends State<ProductCard> {
                       ],
                     ),
                   ),
-
-                  // 가격
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     child: Text(
@@ -464,8 +462,6 @@ class _ProductCardState extends State<ProductCard> {
                 ],
               ),
             ),
-
-            // 🔥 품절 표시 오버레이
             if (isSoldOut)
               Positioned.fill(
                 child: Container(

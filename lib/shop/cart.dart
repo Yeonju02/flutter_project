@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:routinelogapp/admin/admin_product_page.dart';
 import 'package:routinelogapp/shop/payment.dart';
 
 class CartPage extends StatefulWidget {
@@ -28,10 +29,46 @@ class _CartPageState extends State<CartPage> {
     return Scaffold(
       backgroundColor : Colors.white,
       appBar: AppBar(
-        title: const Text('장바구니', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
+        title: const Text(
+          '장바구니',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         backgroundColor: Colors.white,
         leading: const BackButton(),
         actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.push(context,
+                MaterialPageRoute(builder: (context) => const AdminProductPage()),
+              ); // 또는 직접 위젯 호출
+            },
+            child: const Text('관리자', style: TextStyle(color: Colors.black)),
+          ),
+          TextButton(
+            onPressed: () async {
+              final selectedIds = selected.entries
+                  .where((entry) => entry.value)
+                  .map((entry) => entry.key)
+                  .toList();
+
+              for (final docId in selectedIds) {
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(widget.userId)
+                    .collection('cart')
+                    .doc(docId)
+                    .delete();
+              }
+
+              setState(() {
+                for (final id in selectedIds) {
+                  selected.remove(id);
+                  quantities.remove(id);
+                }
+              });
+            },
+            child: const Text('선택 삭제', style: TextStyle(color: Colors.red),),
+          ),
           TextButton(
             onPressed: () {
               final newValue = !_isAllSelected;
@@ -109,7 +146,7 @@ class _CartPageState extends State<CartPage> {
                               ],
                             ),
 
-                            // 이미지 + 삭제버튼
+                            // 이미지
                             Stack(
                               children: [
                                 ClipRRect(
@@ -119,29 +156,6 @@ class _CartPageState extends State<CartPage> {
                                     width: double.infinity,
                                     height: 100,
                                     fit: BoxFit.cover,
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 4,
-                                  right: 4,
-                                  child: GestureDetector(
-                                    onTap: () async {
-                                      await FirebaseFirestore.instance
-                                          .collection('users')
-                                          .doc(widget.userId)
-                                          .collection('cart')
-                                          .doc(docId)
-                                          .delete();
-                                      setState(() {
-                                        quantities.remove(docId);
-                                        selected.remove(docId);
-                                      });
-                                    },
-                                    child: const CircleAvatar(
-                                      radius: 10,
-                                      backgroundColor: Colors.black54,
-                                      child: Icon(Icons.remove, size: 14, color: Colors.white),
-                                    ),
                                   ),
                                 ),
                               ],
@@ -167,21 +181,35 @@ class _CartPageState extends State<CartPage> {
                               children: [
                                 IconButton(
                                   icon: const Icon(Icons.remove, size: 16),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (quantities[docId]! > 1) {
+                                  onPressed: () async {
+                                    if (quantities[docId]! > 1) {
+                                      setState(() {
                                         quantities[docId] = quantities[docId]! - 1;
-                                      }
-                                    });
+                                      });
+
+                                      await FirebaseFirestore.instance
+                                          .collection('users')
+                                          .doc(widget.userId)
+                                          .collection('cart')
+                                          .doc(docId)
+                                          .update({'quantity': quantities[docId]});
+                                    }
                                   },
                                 ),
                                 Text('$quantity'),
                                 IconButton(
                                   icon: const Icon(Icons.add, size: 16),
-                                  onPressed: () {
+                                  onPressed: () async {
                                     setState(() {
                                       quantities[docId] = quantities[docId]! + 1;
                                     });
+
+                                    await FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(widget.userId)
+                                        .collection('cart')
+                                        .doc(docId)
+                                        .update({'quantity': quantities[docId]});
                                   },
                                 ),
                               ],

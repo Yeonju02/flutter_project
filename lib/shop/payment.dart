@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:routinelogapp/shop/port_pay.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../mypage/delivery_address.dart';
+
 class PaymentPage extends StatefulWidget {
   final List<Map<String, dynamic>> products; // 여러 상품
   const PaymentPage({super.key, required this.products});
@@ -48,7 +50,7 @@ class _PaymentPageState extends State<PaymentPage> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
+                  child: Image.network(
                     product['thumbNail'],
                     width: 70,
                     height: 70,
@@ -85,11 +87,37 @@ class _PaymentPageState extends State<PaymentPage> {
     return widgets;
   }
 
+  Future<void> _loadDefaultAddress() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
+
+    if (userId == null) return;
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('addresses')
+        .where('isDefault', isEqualTo: true)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      final data = snapshot.docs.first.data();
+      setState(() {
+        nameController.text = data['name'] ?? '';
+        phoneController.text = data['phone'] ?? '';
+        addressController.text = data['address'] ?? '';
+        requestController.text = data['request'] ?? '';
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _loadUserPoint();
     _calculateTotalPrice();
+    _loadDefaultAddress();
   }
 
   int deliveryFee = 0;
@@ -104,7 +132,7 @@ class _PaymentPageState extends State<PaymentPage> {
     }
 
     final discount = (pointUsed >= 500 && pointUsed % 10 == 0 && pointUsed <= pointAvailable) ? pointUsed : 0;
-    final fee = (sum - discount) >= 50000 ? 0 : 3000;
+    final fee = (sum - discount) >= 50000 ? 0 : 50;
 
     setState(() {
       productTotal = sum;        // 총 상품 금액
@@ -221,6 +249,18 @@ class _PaymentPageState extends State<PaymentPage> {
 
               // 배송 정보 입력
               const Text('배송 정보', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => DeliveryAddressPage()),
+                    );
+                  },
+                  child: const Text('배송지 관리'),
+                ),
+              ),
               const SizedBox(height: 10),
               _buildTextField(nameController, '이름', '받는 분 이름을 입력하세요'),
               _buildTextField(phoneController, '연락처', '010-xxxx-xxxx'),
@@ -380,6 +420,10 @@ class _PaymentPageState extends State<PaymentPage> {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('usedPoint', pointUsed);
+
+    for (var product in widget.products) {
+      print("🔥 주문 상품: $product");
+    }
 
     Navigator.push(
       context,
