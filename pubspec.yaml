@@ -50,6 +50,9 @@ dependencies:
   flutter_linkify: ^6.0.0
   url_launcher: ^6.2.5
   cupertino_icons: ^1.0.8
+  android_alarm_manager_plus:
+  flutter_local_notifications:
+  permission_handler:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
 
@@ -87,6 +90,9 @@ flutter:
     - assets/moon.png
     - assets/products/
     - assets/reviews/
+    - assets/rising_moon.PNG
+    - assets/img.png
+    - assets/moon_background.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
