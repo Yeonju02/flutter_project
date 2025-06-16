@@ -114,6 +114,7 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   String? userId;
+  String? userEmail;
 
   Future<void> _loadUserPoint() async {
     final prefs = await SharedPreferences.getInstance();
@@ -131,13 +132,12 @@ class _PaymentPageState extends State<PaymentPage> {
         .get();
 
     if (query.docs.isEmpty) {
-      print('❌ userId 필드가 "$userId"인 문서를 찾을 수 없습니다.');
+      print('❌ userId가 "$userId"인 문서를 찾을 수 없습니다.');
       return;
     }
 
     final userDoc = query.docs.first;
     final data = userDoc.data();
-    print('✅ 유저 정보: $data');
 
     setState(() {
       final rawPoint = data['point'] ?? 0;
@@ -146,6 +146,7 @@ class _PaymentPageState extends State<PaymentPage> {
       final usable = (rawPoint ~/ 10) * 10;
       pointAvailable = usable >= 500 ? usable : 0;
 
+      userEmail = data['userEmail'] ?? ''; // ✅ 이메일 저장
       pointController.text = '0'; // 초기화
     });
   }
@@ -171,7 +172,9 @@ class _PaymentPageState extends State<PaymentPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('주문/결제')),
+      backgroundColor : Colors.white,
+      appBar: AppBar(title: const Text('주문/결제', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          backgroundColor: Colors.white),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -264,6 +267,12 @@ class _PaymentPageState extends State<PaymentPage> {
                         _calculateTotalPrice();
                       });
                     },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF92BBE2),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                     child: const Text('사용'),
                   ),
                 ],
@@ -301,15 +310,22 @@ class _PaymentPageState extends State<PaymentPage> {
                   Text('${formatter.format(totalPrice)}원', style: const TextStyle(fontSize: 18)),
                 ],
               ),
+              SizedBox(height: 10,),
 
               // 결제 버튼
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _onPayPressed,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF92BBE2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                   child: const Text('결제하기'),
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -332,7 +348,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  void _onPayPressed() {
+  void _onPayPressed() async {
     if (_formKey.currentState!.validate()) {
       // 여기에 KG이니시스 연동 또는 결제 페이지 이동 로직을 작성
       print('주문 정보:');
@@ -362,6 +378,9 @@ class _PaymentPageState extends State<PaymentPage> {
       return;
     }
 
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('usedPoint', pointUsed);
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -369,9 +388,10 @@ class _PaymentPageState extends State<PaymentPage> {
           amount: totalPrice,
           buyerName: nameController.text,
           buyerTel: phoneController.text,
-          buyerEmail: 'user@example.com', // 🟡 추후 유저 이메일 추가 필요
+          buyerEmail: userEmail!,
           buyerAddr: addressController.text,
-          buyerPostcode: '00000', // 🟡 선택사항 (없으면 빈 문자열로)
+          buyerPostcode: '',
+          products: widget.products,
         ),
       ),
     );

@@ -7,12 +7,7 @@ import '../notification/notification_screen.dart';
 import '../shop/shop_main.dart';
 import '../mypage/myPage_main.dart';
 import 'routine_detail.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import '../utils/class/global_timer_manager.dart';
-
-// 알림 인스턴스
-final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -24,35 +19,10 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  Key _calendarRefreshKey = UniqueKey(); // 달력 리프레시용 키
+  Key _calendarRefreshKey = UniqueKey(); // 달력 갱신용
 
-  @override
-  void initState() {
-    super.initState();
-    _setupNotifications();
-  }
-
-  Future<void> _setupNotifications() async {
-    await _initializeNotifications();
-    await _requestNotificationPermission();
-    await GlobalTimerManager.instance.initialize(flutterLocalNotificationsPlugin);
-  }
-
-  Future<void> _initializeNotifications() async {
-    const AndroidInitializationSettings androidSettings =
-    AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const InitializationSettings initSettings =
-    InitializationSettings(android: androidSettings);
-    await flutterLocalNotificationsPlugin.initialize(initSettings);
-  }
-
-  Future<void> _requestNotificationPermission() async {
-    final status = await Permission.notification.status;
-    if (!status.isGranted) {
-      await Permission.notification.request();
-    }
-  }
+  //final prefs = await SharedPreferences.getInstance();  위쪽 import랑 이거 두 줄 쓰면 SharedPreference로 저장된 로그인 id 불러올 수 있음
+  //final userId = prefs.getString('userId');
 
   void _goToPrevMonth() {
     setState(() {
@@ -66,11 +36,12 @@ class _MainPageState extends State<MainPage> {
     });
   }
 
-  void _refreshCalendar() {
+  void _refreshCalendar() {  // 키를 바꿔서 달력 위젯을 갱신하도록 함
     setState(() {
       _calendarRefreshKey = UniqueKey();
     });
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -82,19 +53,19 @@ class _MainPageState extends State<MainPage> {
               padding: const EdgeInsets.only(bottom: 90),
               child: Column(
                 children: [
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: XPLevelBar(),
                   ),
-                  const SizedBox(height: 15),
+                  SizedBox(height: 15),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.chevron_left),
+                          icon: Icon(Icons.chevron_left),
                           onPressed: _goToPrevMonth,
                         ),
                         Column(
@@ -102,14 +73,14 @@ class _MainPageState extends State<MainPage> {
                           children: [
                             Text(
                               '${_focusedDay.year}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
                               '${_focusedDay.month.toString().padLeft(2, '0')}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w400,
                               ),
@@ -117,14 +88,14 @@ class _MainPageState extends State<MainPage> {
                           ],
                         ),
                         IconButton(
-                          icon: const Icon(Icons.chevron_right),
+                          icon: Icon(Icons.chevron_right),
                           onPressed: _goToNextMonth,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 15),
-                  const Divider(thickness: 1),
+                  SizedBox(height: 15),
+                  Divider(thickness: 1),
                   Expanded(
                     child: RoutineCalendar(
                       key: _calendarRefreshKey,
@@ -139,53 +110,62 @@ class _MainPageState extends State<MainPage> {
                         final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) =>
-                                RoutineDetailPage(date: selectedDay),
+                            builder: (context) => RoutineDetailPage(date: selectedDay),
                           ),
-                        );
+                        ).then((value) {
+                          if (value == true) {
+                            setState(() {
+                              _calendarRefreshKey = UniqueKey();
+                            });
+                          }
+                        });
+
 
                         if (result == true) {
-                          _refreshCalendar();
+                          setState(() {
+                            _calendarRefreshKey = UniqueKey();
+                          });
                         }
                       },
                     ),
                   ),
+
                 ],
               ),
             ),
           ),
+
           Positioned(
             left: 0,
             right: 0,
-            bottom: 30,
+            bottom: 30,  // 이거 안하면 너무 아래에 딱 붙는듯
             child: BottomNavBar(
               currentIndex: 2,
               onTap: (index) {
-                switch (index) {
-                  case 0:
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ShopMainPage()),
-                    );
-                    break;
-                  case 1:
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const BoardMainScreen()),
-                    );
-                    break;
-                  case 3:
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const NotificationScreen()),
-                    );
-                    break;
-                  case 4:
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const MyPageMain()),
-                    );
-                    break;
+                if (index == 0) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ShopMainPage()),
+                  );
+                }
+
+                if (index == 1) {
+                  Navigator.push(context,
+                    MaterialPageRoute(builder: (context) => const BoardMainScreen()),
+                  );
+                }
+
+                if (index == 3) {
+                  Navigator.push(context,
+                    MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                  );
+                }
+
+                if (index == 4) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const MyPageMain()),
+                  );
                 }
               },
             ),

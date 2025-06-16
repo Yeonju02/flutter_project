@@ -185,7 +185,11 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(isEditMode ? '글 수정' : '글 작성')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+          title: Text(isEditMode ? '글 수정' : '글 작성', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          backgroundColor: Colors.white,
+      ),
       body: _isUploading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
