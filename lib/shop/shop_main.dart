@@ -55,13 +55,10 @@ class _ShopMainPageState extends State<ShopMainPage> {
       );
     }
 
-    final List<String> visibleMainCategories = ['전체'];
-
     return Scaffold(
       backgroundColor : Colors.white,
       appBar: AppBar(
           automaticallyImplyLeading: false,
-          title: const Text('', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
           backgroundColor: Colors.white
       ),
       body: Stack(

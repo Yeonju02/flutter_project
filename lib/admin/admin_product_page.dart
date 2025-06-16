@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:routinelogapp/admin/admin_product_add.dart';
 import '../main/main_page.dart';
 import '../custom/admin_bottom_bar.dart';
+import 'admin_product_edit.dart';
 
 class AdminProductPage extends StatefulWidget {
   const AdminProductPage({super.key});
@@ -31,6 +32,7 @@ class _AdminProductPageState extends State<AdminProductPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor : Colors.white,
       appBar: AppBar(
         backgroundColor: const Color(0xFF819CFF),
         title: Row(
@@ -159,7 +161,10 @@ class _AdminProductPageState extends State<AdminProductPage> {
                             children: [
                               TextButton(
                                 onPressed: () {
-                                  // TODO: 수정 페이지로 이동
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => EditProductPage(doc: products[index])),
+                                  );
                                 },
                                 child: const Text('Edit'),
                               ),
