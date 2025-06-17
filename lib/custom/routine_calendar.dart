@@ -20,7 +20,7 @@ class RoutineCalendar extends StatefulWidget {
 }
 
 class _RoutineCalendarState extends State<RoutineCalendar> {
-  Map<DateTime, List<String>> _events = {};
+  Map<DateTime, List<Map<String, String>>> _events = {};
   late DateTime _focusedDay;
   DateTime? _selectedDay;
 
@@ -53,27 +53,31 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
         .collection('routineLogs')
         .get();
 
-    Map<DateTime, List<String>> eventMap = {};
+    Map<DateTime, List<Map<String, String>>> eventMap = {};
 
     for (var doc in routineSnapshot.docs) {
       final data = doc.data();
       final dateStr = data['date'];
       final title = data['title'];
+      final routineType = data['routineType']; // 'morning' or 'night'
 
-      if (dateStr != null && title != null) {
+      if (dateStr != null && title != null && routineType != null) {
         final date = DateTime.parse(dateStr);
         final dateKey = DateTime.utc(date.year, date.month, date.day);
-        eventMap.putIfAbsent(dateKey, () => []).add(title);
+        eventMap.putIfAbsent(dateKey, () => []).add({
+          'title': title,
+          'type': routineType,
+        });
       }
     }
 
     setState(() {
       _events = eventMap;
-      _selectedDay ??= _focusedDay; // 초기 진입 시 루틴 보이게
+      _selectedDay ??= _focusedDay;
     });
   }
 
-  List<String> _getEventsForDay(DateTime day) {
+  List<Map<String, String>> _getEventsForDay(DateTime day) {
     return _events[DateTime.utc(day.year, day.month, day.day)] ?? [];
   }
 
@@ -87,6 +91,11 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
 
   @override
   Widget build(BuildContext context) {
+    final events = List<Map<String, String>>.from(
+      _getEventsForDay(_selectedDay ?? _focusedDay),
+    );
+    events.sort((a, b) => a['type'] == 'night' ? 1 : -1);
+
     return Column(
       children: [
         TableCalendar(
@@ -97,7 +106,7 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
           selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
           onDaySelected: _handleDaySelected,
           eventLoader: _getEventsForDay,
-          calendarStyle: CalendarStyle(
+          calendarStyle: const CalendarStyle(
             markerDecoration: BoxDecoration(
               color: Colors.lightBlue,
               shape: BoxShape.circle,
@@ -111,7 +120,7 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
                   child: Container(
                     width: 6,
                     height: 6,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.lightBlue,
                     ),
@@ -122,25 +131,30 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
             },
           ),
         ),
-        Divider(thickness: 2, color: Colors.grey),
-        SizedBox(height: 8),
-        ..._getEventsForDay(_selectedDay ?? _focusedDay).map(
-              (event) => Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40, vertical: 18),
+        const Divider(thickness: 2, color: Colors.grey),
+        const SizedBox(height: 8),
+        ...events.map((event) {
+          final isNight = event['type'] == 'night';
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(Icons.circle, size: 10, color: Colors.lightBlue),
-                SizedBox(width: 14),
+                Icon(
+                  Icons.circle,
+                  size: 10,
+                  color: isNight ? const Color(0xFFFFC107) : Colors.lightBlue,
+                ),
+                const SizedBox(width: 14),
                 Text(
-                  event,
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                  event['title'] ?? '',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-          ),
-        ),
+          );
+        }),
       ],
     );
   }
