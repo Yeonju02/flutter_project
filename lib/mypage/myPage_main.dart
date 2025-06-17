@@ -10,12 +10,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:routinelogapp/notification/notification_screen.dart';
 
 import '../login/login_page.dart';
 import '../board/board_main_screen.dart';
 import '../main/main_page.dart';
 import '../shop/shop_main.dart';
 import 'delivery_address.dart';
+import 'privacy_policy_page.dart';
 
 import '../custom/bottom_nav_bar.dart';
 
@@ -88,24 +90,48 @@ class _MyPageMainState extends State<MyPageMain> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
 
-    Query query = FirebaseFirestore.instance
-        .collection('orders')
-        .where('userId', isEqualTo: user.uid);
+    final ordersRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('orders');
+
+    Query query;
 
     if (isCompleted) {
-      // 배송 완료 목록
-      query = query.where('status', isEqualTo: 'completed');
+      query = ordersRef.where('status', isEqualTo: '배송완료');
     } else {
-      // 배송 대기 목록 (배송 전, 배송 중)
-      query = query.where('status', whereIn: ['pending', 'shipping']);
+      query = ordersRef.where('status', whereIn: ['결제완료', '배송중']);
     }
 
     final snapshot = await query.get();
 
-    return snapshot.docs
-        .map((doc) => doc.data() as Map<String, dynamic>)
-        .toList();
+    List<Map<String, dynamic>> results = [];
+
+    for (var doc in snapshot.docs) {
+      final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      final productId = data['productId'];
+
+      // 상품 정보 가져오기
+      final productDoc = await FirebaseFirestore.instance
+          .collection('product')
+          .doc(productId)
+          .get();
+
+      final productData = productDoc.data();
+
+      if (productData != null) {
+        results.add({
+          ...data,
+          'productName': productData['productName'],
+          'productPrice': productData['productPrice'],
+          'productImage': productData['imgPath'], // 이미지 경로도 추가
+        });
+      }
+    }
+
+    return results;
   }
+
 
   List<Map<String, dynamic>> orderList = [];
   bool isLoading = true;
@@ -150,35 +176,36 @@ class _MyPageMainState extends State<MyPageMain> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // notiEnable 필드 가져오기
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    if (userDoc.exists) {
-      final userData = userDoc.data();
-      notiEnabled = userData?['notiEnable'] ?? true;
-    } else {
-      notiEnabled = true;
-    }
+    final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final settingsDocRef = userDocRef.collection('notiSettings').doc('main');
 
-    // notiSettings 서브 컬렉션 문서 가져오기
-    final settingsDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('notiSettings')
-        .doc('main')
-        .get();
+    // notiEnable은 이미 생성된 값이라 그대로 가져옴
+    final userDoc = await userDocRef.get();
+    final userData = userDoc.data();
+    notiEnabled = userData?['notiEnable'] ?? true;
+
+    // notiSettings 문서 확인
+    final settingsDoc = await settingsDocRef.get();
 
     if (settingsDoc.exists) {
+      // 기존 데이터 불러오기
       final settingsData = settingsDoc.data();
       commentNotification = settingsData?['comment'] ?? true;
       likeNotification = settingsData?['like'] ?? true;
     } else {
+      // 문서 없으면 기본값 생성
       commentNotification = true;
       likeNotification = true;
+
+      await settingsDocRef.set({
+        'comment': true,
+        'like': true,
+      });
     }
 
-    // 상태 갱신
     setState(() {});
   }
+
 
 
   Future<void> _updateNotiEnable(bool enable) async {
@@ -971,7 +998,7 @@ class _MyPageMainState extends State<MyPageMain> {
             itemCount: orderList.length,
             itemBuilder: (context, index) {
               final order = orderList[index];
-              return order['status'] == 'pending'
+              return order['status'] == '결제완료'
                   ? _buildPendingOrderItem(order)
                   : _buildCompletedOrderItem(order);
             },
@@ -980,6 +1007,21 @@ class _MyPageMainState extends State<MyPageMain> {
       ],
     );
   }
+
+  double _getProgress(String status) {
+    switch (status) {
+      case '결제완료':
+        return 0.33;
+      case '배송중':
+        return 0.66;
+      case '배송완료':
+        return 1.0;
+      default:
+        return 0.0;
+    }
+  }
+
+
   Widget _buildPendingOrderItem(Map<String, dynamic> order) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1015,17 +1057,27 @@ class _MyPageMainState extends State<MyPageMain> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("배송 대기", style: TextStyle(fontWeight: FontWeight.bold)),
-              Text("배송중", style: TextStyle(color: Colors.grey)),
-              Text("배송 완료", style: TextStyle(color: Colors.grey)),
+              Text("배송 대기", style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: order['status'] == '결제완료' ? Colors.black : Colors.grey,
+              )),
+              Text("배송중", style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: order['status'] == '배송중' ? Colors.black : Colors.grey,
+              )),
+              Text("배송 완료", style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: order['status'] == '배송완료' ? Colors.black : Colors.grey,
+              )),
             ],
           ),
           SizedBox(height: 4),
           LinearProgressIndicator(
-            value: 0.33,
+            value: _getProgress(order['status']),
             color: Colors.black87,
             backgroundColor: Colors.grey.shade300,
           ),
+
           SizedBox(height: 8),
           Center(
             child: TextButton(
@@ -1104,10 +1156,6 @@ class _MyPageMainState extends State<MyPageMain> {
       ),
     );
   }
-
-
-
-
 
   Widget _buildEmptyOrderView() {
     return Center(
@@ -1223,7 +1271,12 @@ class _MyPageMainState extends State<MyPageMain> {
                 MaterialPageRoute(builder: (context) => DeliveryAddressPage()),
               );
             }),
-            _buildSettingItem("개인정보 처리방침", () {}),
+            _buildSettingItem("개인정보 처리방침", () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PrivacyPolicyPage(),)
+              );
+            }),
             _buildSettingItem("로그아웃", () {
               _showLogoutDialog();
             }),
@@ -1332,7 +1385,7 @@ class _MyPageMainState extends State<MyPageMain> {
                         children: [
                           Text(
                             userData!['nickName'] ?? '',
-                            style: const TextStyle(fontSize: 20),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
                           Text(userData!['userEmail'] ?? ''),
@@ -1340,7 +1393,7 @@ class _MyPageMainState extends State<MyPageMain> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.settings, color: Colors.black),
+                      icon: const Icon(Icons.edit, color: Colors.black),
                       onPressed: () async {
                         originalImagePath = userData?['imgPath'];
                         pickedImage = null;
@@ -1410,20 +1463,25 @@ class _MyPageMainState extends State<MyPageMain> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ShopMainPage(),
+                      builder: (context) => ShopMainPage(),
                     ),
                   );
                 } else if (index == 1) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const BoardMainScreen(),
+                      builder: (context) => BoardMainScreen(),
                     ),
                   );
                 } else if (index == 2) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const MainPage()),
+                    MaterialPageRoute(builder: (context) => MainPage()),
+                  );
+                } else if (index == 3) {
+                  Navigator.push(
+                    context, 
+                    MaterialPageRoute(builder: (context) => NotificationScreen(),)
                   );
                 }
               },
