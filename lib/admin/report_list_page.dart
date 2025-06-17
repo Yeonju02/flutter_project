@@ -43,7 +43,11 @@ class ReportListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('신고 목록')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('신고', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: Colors.white,
+      ),
       body: FutureBuilder<QuerySnapshot>(
         future: FirebaseFirestore.instance.collection('boards').get(),
         builder: (context, boardSnap) {

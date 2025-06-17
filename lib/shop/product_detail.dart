@@ -14,12 +14,8 @@ class ProductDetailPage extends StatefulWidget {
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
   int quantity = 1;
-  String selectedColor = 'blue';
+  String selectedColor = '';
   final formatter = NumberFormat('#,###');
-
-  double averageScore = 0.0;
-  int totalReviews = 0;
-  Map<int, int> scoreCountMap = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
 
   String? userId;
 
@@ -36,40 +32,31 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     });
   }
 
-  void _calculateReviewStats(List<QueryDocumentSnapshot> docs) {
-    if (docs.isEmpty) {
-      setState(() {
-        averageScore = 0.0;
-        totalReviews = 0;
-        scoreCountMap = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
-      });
-      return;
-    }
-
-    int totalScore = 0;
-    Map<int, int> tempMap = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
-
-    for (var doc in docs) {
-      final score = (doc['score'] as num?)?.round() ?? 0;
-      totalScore += score;
-      if (tempMap.containsKey(score)) tempMap[score] = tempMap[score]! + 1;
-    }
-
-    setState(() {
-      averageScore = (totalScore / docs.length).toDouble();
-      totalReviews = docs.length;
-      scoreCountMap = tempMap;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final product = widget.data;
+    final List<Map<String, dynamic>> colorOptions =
+    List<Map<String, dynamic>>.from(product['colors'] ?? []);
+    final List<String> colorList =
+    colorOptions.map((e) => e['color'].toString()).toList();
+    selectedColor = selectedColor.isEmpty && colorList.isNotEmpty
+        ? colorList[0]
+        : selectedColor;
+
+    final int totalStock = colorOptions.fold<int>(0, (sum, item) {
+      final s = item['stock'];
+      return sum + (s is int ? s : (s is double ? s.toInt() : 0));
+    });
+
+    final colorInfo = colorOptions.firstWhere(
+            (e) => e['color'] == selectedColor,
+        orElse: () => colorOptions.first);
 
     return Scaffold(
-      backgroundColor : Colors.white,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('상세정보', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
+        title: const Text('상세정보',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: Colors.white,
         leading: const BackButton(),
       ),
@@ -99,13 +86,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       'productId': product['productId'],
                       'productName': product['productName'],
                       'productPrice': product['productPrice'],
-                      'thumbNail': product['imgPath'],
+                      'thumbNail': colorInfo['imgPath'],
                       'selectedColor': selectedColor,
                       'quantity': quantity,
                       'addedAt': Timestamp.now(),
                     };
 
-                    await cartRef.add(cartItem);
+                    await cartRef.doc(product['productId']).set(cartItem);
 
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('장바구니에 담겼습니다.')),
@@ -114,8 +101,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFFE0E0E0),
                     foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                   child: const Text('담아두기'),
                 ),
@@ -126,7 +115,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       'productId': product['productId'],
                       'productName': product['productName'],
                       'productPrice': product['productPrice'],
-                      'thumbNail': product['imgPath'],
+                      'thumbNail': colorInfo['imgPath'],
                       'selectedColor': selectedColor,
                       'quantity': quantity,
                     };
@@ -134,7 +123,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => PaymentPage(products: [orderItem]),
+                        builder: (context) =>
+                            PaymentPage(products: [orderItem]),
                       ),
                     );
                   },
@@ -143,8 +133,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFF92BBE2),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ],
@@ -160,8 +152,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             // 이미지
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: Image.asset(
-                product['imgPath'],
+              child: Image.network(
+                colorInfo['imgPath'],
                 height: 250,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -169,75 +161,43 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ),
             const SizedBox(height: 16),
 
-            // 이름 + 별점
+            // 이름
             Text(product['productName'],
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                style:
+                const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+
+            const Text('제품 설명',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            StreamBuilder(
-              stream: FirebaseFirestore.instance
-                  .collection('products')
-                  .doc(product['productId'])
-                  .collection('reviews')
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Text('리뷰 없음', style: TextStyle(color: Colors.grey));
-                }
+            Text(product['description'], style: const TextStyle(height: 1.5)),
+            const SizedBox(height: 12),
 
-                final docs = snapshot.data!.docs;
-                int totalScore = 0;
-                for (var doc in docs) {
-                  final rawScore = doc['score'];
-                  double scoreDouble;
-                  if (rawScore is num) {
-                    scoreDouble = rawScore.toDouble();
-                  } else if (rawScore is String) {
-                    scoreDouble = double.tryParse(rawScore) ?? 0.0;
-                  } else {
-                    scoreDouble = 0.0;
-                  }
-                  totalScore += scoreDouble.round();
-                }
-
-                final avg = totalScore / docs.length;
-
-                return Row(
+            const Text('색상 선택',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: colorOptions.map((colorData) {
+                final colorId = colorData['color'].toString();
+                final stock = colorData['stock'] ?? 0;
+                return Column(
                   children: [
-                    const Icon(Icons.star, color: Colors.amber, size: 18),
-                    const SizedBox(width: 4),
-                    Text('별점 ${avg.toStringAsFixed(1)}  (${docs.length} Reviews)',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    _buildColorOption(colorId, _mapColorIdToColor(colorId)),
+                    const SizedBox(height: 4),
+                    Text('재고 $stock개',
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.black54)),
                   ],
                 );
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // 설명
-            const Text('제품 설명', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(
-              product['description'],
-              style: const TextStyle(height: 1.5),
-            ),
-            const SizedBox(height: 12),
-
-            // 색상 선택
-            const Text('색', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                _buildColorOption('blue', Colors.blue),
-                _buildColorOption('green', Colors.green),
-                _buildColorOption('pink', Colors.pinkAccent),
-              ],
+              }).toList(),
             ),
             const SizedBox(height: 20),
 
-            // 수량 조절
             Row(
               children: [
-                const Text('갯수', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('수량', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(width: 20),
                 IconButton(
                   icon: const Icon(Icons.remove),
@@ -259,7 +219,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ],
             ),
 
-            // 리뷰 목록
             const Divider(height: 32),
             const Text('리뷰', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -267,7 +226,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             StreamBuilder(
               stream: FirebaseFirestore.instance
                   .collection('products')
-                  .doc(product['productId']) // productId 기준으로 조회
+                  .doc(product['productId']) // productId 기준
                   .collection('reviews')
                   .orderBy('createdAt', descending: true)
                   .snapshots(),
@@ -277,13 +236,17 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 }
 
                 final docs = snapshot.data!.docs;
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _calculateReviewStats(docs);
-                });
 
                 if (docs.isEmpty) {
                   return const Text('아직 작성된 리뷰가 없습니다.');
                 }
+
+                double totalScore = 0;
+                for (var doc in docs) {
+                  final score = (doc['score'] ?? 0).toDouble();
+                  totalScore += score;
+                }
+                final avg = docs.isEmpty ? 0 : totalScore / docs.length;
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,90 +255,59 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       children: [
                         const Icon(Icons.star, color: Colors.amber, size: 24),
                         const SizedBox(width: 4),
-                        Text(averageScore.toStringAsFixed(1),
+                        Text(avg.toStringAsFixed(1),
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(width: 8),
-                        Text('$totalReviews개의 상품리뷰가 있습니다.'),
+                        Text('${docs.length}개의 리뷰'),
                       ],
                     ),
                     const SizedBox(height: 16),
-
-                    Column(
-                      children: [5, 4, 3, 2, 1].map((star) {
-                        final count = scoreCountMap[star] ?? 0;
-                        final percent = totalReviews == 0 ? 0 : (count / totalReviews * 100).round();
-
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              Text('$star'),
-                              const Icon(Icons.star, size: 14, color: Colors.amber),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: LinearProgressIndicator(
-                                  value: percent / 100,
-                                  backgroundColor: Colors.grey[300],
-                                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF92BBE2)),
-                                  minHeight: 8,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text('$percent%'),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 24),
 
                     ListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: docs.length,
                       itemBuilder: (context, index) {
-                        final data = docs[index].data() as Map<String, dynamic>;
+                        final review = docs[index].data() as Map<String, dynamic>;
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // 사용자 정보 + 별점
                               Row(
                                 children: [
                                   const Icon(Icons.star, size: 16, color: Colors.amber),
                                   const SizedBox(width: 4),
-                                  Text('${data['score']}점'),
+                                  Text('${review['score']}점'),
                                   const SizedBox(width: 12),
                                   Text(
-                                    (data['createdAt'] as Timestamp).toDate().toString().split(' ').first,
+                                    (review['createdAt'] as Timestamp).toDate().toString().split(' ').first,
                                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                                   ),
                                   const SizedBox(width: 8),
-                                  Text('@${data['userId']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  Text('@${review['userId']}', style: const TextStyle(fontWeight: FontWeight.bold)),
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              Text(data['content'], style: const TextStyle(height: 1.5)),
+                              Text(review['content'], style: const TextStyle(height: 1.5)),
 
-                              // 이미지 (있을 경우)
-                              if (data['reviewImg'] != null && data['reviewImg'] is List) ...[
+                              if (review['reviewImg'] != null && review['reviewImg'] is List) ...[
                                 const SizedBox(height: 8),
                                 SizedBox(
-                                  height: 120,
+                                  height: 100,
                                   child: ListView.builder(
                                     scrollDirection: Axis.horizontal,
-                                    itemCount: (data['reviewImg'] as List).length,
+                                    itemCount: (review['reviewImg'] as List).length,
                                     itemBuilder: (context, imgIndex) {
-                                      final imgPath = data['reviewImg'][imgIndex];
+                                      final imgPath = review['reviewImg'][imgIndex];
                                       return Padding(
                                         padding: const EdgeInsets.only(right: 8),
                                         child: ClipRRect(
                                           borderRadius: BorderRadius.circular(10),
-                                          child: Image.asset(
+                                          child: Image.network(
                                             imgPath,
-                                            width: 120,
-                                            height: 120,
+                                            width: 100,
+                                            height: 100,
                                             fit: BoxFit.cover,
                                           ),
                                         ),
@@ -393,6 +325,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 );
               },
             ),
+
           ],
         ),
       ),
@@ -489,7 +422,59 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       case 'grey':
         return '그레이';
       default:
-        return id; // 정의되지 않은 색상은 그대로 표시
+        return id;
     }
+  }
+}
+
+Color _mapColorIdToColor(String id) {
+  switch (id.toLowerCase()) {
+    case 'blue':
+      return Colors.blue;
+    case 'lightblue':
+      return Colors.lightBlue;
+    case 'navy':
+      return Colors.blue.shade900;
+    case 'skyblue':
+      return Colors.lightBlueAccent;
+    case 'green':
+      return Colors.green;
+    case 'lightgreen':
+      return Colors.lightGreen;
+    case 'olive':
+      return const Color(0xFF808000);
+    case 'lime':
+      return Colors.lime;
+    case 'red':
+      return Colors.red;
+    case 'pink':
+      return Colors.pink;
+    case 'pinkaccent':
+      return Colors.pinkAccent;
+    case 'hotpink':
+      return const Color(0xFFFF69B4);
+    case 'orange':
+      return Colors.orange;
+    case 'yellow':
+      return Colors.yellow;
+    case 'gold':
+      return const Color(0xFFFFD700);
+    case 'brown':
+      return Colors.brown;
+    case 'beige':
+      return const Color(0xFFF5F5DC);
+    case 'purple':
+      return Colors.purple;
+    case 'lavender':
+      return const Color(0xFFE6E6FA);
+    case 'white':
+      return Colors.white;
+    case 'black':
+      return Colors.black;
+    case 'gray':
+    case 'grey':
+      return Colors.grey;
+    default:
+      return Colors.grey;
   }
 }
