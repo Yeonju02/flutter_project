@@ -26,8 +26,10 @@ class _CartPageState extends State<CartPage> {
         .orderBy('addedAt', descending: true);
 
     return Scaffold(
+      backgroundColor : Colors.white,
       appBar: AppBar(
-        title: const Text('장바구니'),
+        title: const Text('장바구니', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
+        backgroundColor: Colors.white,
         leading: const BackButton(),
         actions: [
           TextButton(
@@ -87,7 +89,7 @@ class _CartPageState extends State<CartPage> {
                       return Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.grey[100],
+                          color: Color(0xFFF0F4FA),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
@@ -234,12 +236,10 @@ class _CartPageState extends State<CartPage> {
                       icon: const Icon(Icons.payment),
                       label: const Text('주문하기'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
+                        backgroundColor: Color(0xFF92BBE2),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     )
                   ],

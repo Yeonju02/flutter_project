@@ -1,31 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:routinelogapp/custom/night_date_item.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
-import '../custom/date_item.dart';
 
-class DateSlider extends StatefulWidget {
+class NightDateSlider extends StatefulWidget {
   final DateTime initialDate;
   final Function(DateTime) onDateSelected;
 
-  const DateSlider({
+  const NightDateSlider({
     super.key,
     required this.initialDate,
     required this.onDateSelected,
   });
 
   @override
-  State<DateSlider> createState() => DateSliderState(); // 클래스명 변경됨
+  State<NightDateSlider> createState() => NightDateSliderState();
 }
 
-class DateSliderState extends State<DateSlider> {
+class NightDateSliderState extends State<NightDateSlider> {
   late DateTime selectedDate;
   late List<DateTime> dates;
   final ScrollController _scrollController = ScrollController();
-  Map<String, bool> morningRoutineDates = {};
+  Map<String, bool> nightRoutineDates = {};
 
   Future<void> refresh() async {
-    await loadMorningRoutineDates();
+    await loadNightRoutineDates();
   }
 
   @override
@@ -39,7 +39,7 @@ class DateSliderState extends State<DateSlider> {
           (i) => widget.initialDate.add(Duration(days: i - 30)),
     );
 
-    loadMorningRoutineDates();
+    loadNightRoutineDates();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       int index = dates.indexWhere((d) =>
@@ -47,12 +47,14 @@ class DateSliderState extends State<DateSlider> {
           d.month == selectedDate.month &&
           d.day == selectedDate.day);
       if (index != -1) {
-        _scrollController.jumpTo((index * 72) - (MediaQuery.of(context).size.width / 2) + 36);
+        _scrollController.jumpTo(
+          (index * 72) - (MediaQuery.of(context).size.width / 2) + 36,
+        );
       }
     });
   }
 
-  Future<void> loadMorningRoutineDates() async {
+  Future<void> loadNightRoutineDates() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId');
     if (userId == null) return;
@@ -71,7 +73,7 @@ class DateSliderState extends State<DateSlider> {
         .collection('users')
         .doc(userDocId)
         .collection('routineLogs')
-        .where('routineType', isEqualTo: 'morning')
+        .where('routineType', isEqualTo: 'night')
         .get();
 
     final result = <String, bool>{};
@@ -81,13 +83,13 @@ class DateSliderState extends State<DateSlider> {
     }
 
     setState(() {
-      morningRoutineDates = result;
+      nightRoutineDates = result;
     });
   }
 
   bool hasEvent(DateTime date) {
     final key = DateFormat('yyyy-MM-dd').format(date);
-    return morningRoutineDates[key] == true;
+    return nightRoutineDates[key] == true;
   }
 
   @override
@@ -104,7 +106,7 @@ class DateSliderState extends State<DateSlider> {
               date.month == selectedDate.month &&
               date.day == selectedDate.day;
 
-          return DateItem(
+          return NightDateItem(
             date: date,
             isSelected: isSelected,
             hasEvent: hasEvent(date),

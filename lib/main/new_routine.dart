@@ -24,6 +24,7 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
   TimeOfDay startTime = TimeOfDay.now();
   TimeOfDay endTime = TimeOfDay.now();
   bool showTimeError = false;
+  bool showTimeOrderError = false;
 
   void _showTimePicker({
     required BuildContext outerContext,
@@ -81,6 +82,12 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
     );
   }
 
+  bool _isStartTimeBeforeEndTime(TimeOfDay start, TimeOfDay end) {
+    final startTotalMinutes = start.hour * 60 + start.minute;
+    final endTotalMinutes = end.hour * 60 + end.minute;
+    return startTotalMinutes < endTotalMinutes;
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateStr = DateFormat('yyyy-MM-dd').format(widget.selectedDate);
@@ -88,8 +95,8 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
     final endStr = endTime.format(context);
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+      decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -99,7 +106,7 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
           Container(
             width: 40,
             height: 4,
-            margin: EdgeInsets.only(bottom: 20),
+            margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
               color: Colors.grey.shade300,
               borderRadius: BorderRadius.circular(2),
@@ -117,7 +124,7 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                   children: [
                     TextField(
                       controller: titleController,
-                      style: TextStyle(
+                      style: const TextStyle(
                           fontSize: 18, fontWeight: FontWeight.bold),
                       decoration: const InputDecoration(
                         isDense: true,
@@ -150,7 +157,7 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.edit, size: 18, color: Colors.grey),
+                icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
                 onPressed: () {
                   setState(() {
                     isEditingTitle = true;
@@ -160,22 +167,22 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
             ],
           ),
 
-          SizedBox(height: 30),
+          const SizedBox(height: 30),
 
           Align(
             alignment: Alignment.centerLeft,
-            child: Text('시간 및 날짜',
+            child: const Text('시간 및 날짜',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Row(
             children: [
-              Icon(Icons.calendar_today, size: 20),
-              SizedBox(width: 12),
-              Text(dateStr, style: TextStyle(fontSize: 16)),
+              const Icon(Icons.calendar_today, size: 20),
+              const SizedBox(width: 12),
+              Text(dateStr, style: const TextStyle(fontSize: 16)),
             ],
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Row(
             children: [
               GestureDetector(
@@ -192,15 +199,15 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                 },
                 child: Row(
                   children: [
-                    Icon(Icons.access_time, size: 20),
-                    SizedBox(width: 6),
-                    Text(startStr, style: TextStyle(fontSize: 16)),
+                    const Icon(Icons.access_time, size: 20),
+                    const SizedBox(width: 6),
+                    Text(startStr, style: const TextStyle(fontSize: 16)),
                   ],
                 ),
               ),
-              SizedBox(width: 12),
-              Text('~', style: TextStyle(fontSize: 18)),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
+              const Text('~', style: TextStyle(fontSize: 18)),
+              const SizedBox(width: 12),
               GestureDetector(
                 onTap: () {
                   _showTimePicker(
@@ -215,9 +222,9 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                 },
                 child: Row(
                   children: [
-                    Icon(Icons.access_time, size: 20),
-                    SizedBox(width: 6),
-                    Text(endStr, style: TextStyle(fontSize: 16)),
+                    const Icon(Icons.access_time, size: 20),
+                    const SizedBox(width: 6),
+                    Text(endStr, style: const TextStyle(fontSize: 16)),
                   ],
                 ),
               ),
@@ -225,23 +232,31 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
           ),
           if (showTimeError)
             Padding(
-              padding: EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.only(top: 8),
               child: Text(
                 '오전 시간만 선택할 수 있어요.',
                 style: TextStyle(color: Colors.red.shade700, fontSize: 14),
               ),
             ),
+          if (showTimeOrderError)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '시작 시간은 종료 시간보다 빨라야 해요.',
+                style: TextStyle(color: Colors.red.shade700, fontSize: 14),
+              ),
+            ),
 
-          SizedBox(height: 30),
-          Divider(thickness: 1),
-          SizedBox(height: 30),
+          const SizedBox(height: 30),
+          const Divider(thickness: 1),
+          const SizedBox(height: 30),
 
           Align(
             alignment: Alignment.centerLeft,
-            child: Text('목표',
+            child: const Text('목표',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -284,7 +299,7 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.edit, size: 18, color: Colors.grey),
+                icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
                 onPressed: () {
                   setState(() {
                     isEditingGoal = true;
@@ -294,7 +309,7 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
             ],
           ),
 
-          SizedBox(height: 30),
+          const SizedBox(height: 30),
 
           Column(
             children: [
@@ -314,7 +329,7 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                     ),
                   );
                 },
-                child: Text(
+                child: const Text(
                   '아침 루틴에는 이런 것들이 있어요!',
                   style: TextStyle(
                     decoration: TextDecoration.underline,
@@ -327,7 +342,7 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                 onPressed: () {
                   // 나만의 루틴 가져오기
                 },
-                child: Text(
+                child: const Text(
                   '나만의 루틴 가져오기',
                   style: TextStyle(
                     decoration: TextDecoration.underline,
@@ -339,11 +354,17 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
             ],
           ),
 
-          SizedBox(height: 50),
+          const SizedBox(height: 50),
 
           CustomBlueButton(
             text: '루틴 추가하기',
             onPressed: () async {
+              setState(() {
+                showTimeOrderError =
+                !_isStartTimeBeforeEndTime(startTime, endTime);
+              });
+              if (showTimeOrderError) return;
+
               if (routineCategory != 'recommend') {
                 routineCategory = 'custom';
               }
@@ -371,9 +392,10 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                 final userDocId = query.docs.first.id;
 
                 final routineData = {
-                  'title' : titleController.text,
+                  'title': titleController.text,
                   'routineType': 'morning',
-                  'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
+                  'date': DateFormat('yyyy-MM-dd')
+                      .format(widget.selectedDate),
                   'startTime': startTime.format(context),
                   'endTime': endTime.format(context),
                   'isFinished': false,
@@ -391,15 +413,14 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                     .collection('routineLogs')
                     .add(routineData);
 
-                print('루틴 저장 완료 (문서 ID: $userDocId)');
-                Navigator.pop(context);
+                Navigator.pop(context, true);
               } catch (e) {
                 print('저장 중 오류 발생: $e');
               }
             },
           ),
 
-          SizedBox(height: 40),
+          const SizedBox(height: 40),
         ],
       ),
     );

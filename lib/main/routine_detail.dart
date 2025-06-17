@@ -1,3 +1,4 @@
+// routine_detail.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../custom/date_slider.dart';
@@ -5,9 +6,7 @@ import 'package:flutter_switch/flutter_switch.dart';
 import 'daily_routine.dart';
 import '../custom/custom_blue_button.dart';
 import 'new_routine.dart';
-import '../custom/bottom_nav_bar.dart';
-import '../shop/shop_main.dart';
-import '../board/board_main_screen.dart';
+import 'night_routine_detail.dart';
 
 class RoutineDetailPage extends StatefulWidget {
   final DateTime date;
@@ -15,12 +14,12 @@ class RoutineDetailPage extends StatefulWidget {
   const RoutineDetailPage({super.key, required this.date});
 
   @override
-  State<RoutineDetailPage> createState() => _RoutineDetailPageState();
+  State<RoutineDetailPage> createState() => RoutineDetailPageState();
 }
 
-class _RoutineDetailPageState extends State<RoutineDetailPage> {
+class RoutineDetailPageState extends State<RoutineDetailPage> {
   late DateTime selectedDate;
-  bool isDayMode = false;
+  final GlobalKey<DateSliderState> sliderKey = GlobalKey();
 
   @override
   void initState() {
@@ -37,11 +36,11 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
 
             // 연/월 + 뒤로가기 + 스위치
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -49,20 +48,14 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.arrow_back),
-                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => Navigator.pop(context, true),
                         padding: EdgeInsets.zero,
                         constraints: BoxConstraints(),
                       ),
-                      SizedBox(height: 10),
-                      Text(
-                        '${selectedDate.year}',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        selectedDate.month.toString().padLeft(2, '0'),
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                      ),
+                      const SizedBox(height: 10),
+                      Text('${selectedDate.year}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                      Text(selectedDate.month.toString().padLeft(2, '0'), style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   Spacer(),
@@ -72,16 +65,21 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
                       width: 60,
                       height: 30,
                       toggleSize: 25,
-                      value: isDayMode,
+                      value: false, // 낮 루틴은 항상 false
                       activeColor: Colors.indigo,
                       inactiveColor: Colors.grey.shade200,
                       toggleColor: Colors.white,
                       activeIcon: Image.asset('assets/moon.png', width: 20, height: 20),
                       inactiveIcon: Image.asset('assets/sun.png', width: 20, height: 20),
                       onToggle: (val) {
-                        setState(() {
-                          isDayMode = val;
-                        });
+                        if (val) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => NightRoutineDetailPage(date: selectedDate),
+                            ),
+                          );
+                        }
                       },
                     ),
                   ),
@@ -89,10 +87,9 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
               ),
             ),
 
-            SizedBox(height: 20),
-
-            // 날짜 슬라이더
+            const SizedBox(height: 20),
             DateSlider(
+              key: sliderKey,
               initialDate: selectedDate,
               onDateSelected: (newDate) {
                 setState(() {
@@ -100,23 +97,27 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
                 });
               },
             ),
+            const SizedBox(height: 20),
+            const Divider(thickness: 1.2),
+            const SizedBox(height: 20),
 
-            SizedBox(height: 20),
-            Divider(thickness: 1.2),
-            SizedBox(height: 20),
+            Expanded(
+              child: DailyRoutine(
+                key: UniqueKey(),
+                selectedDate: selectedDate,
+                routineType: 'morning',
+              ),
+            ),
 
-            // 루틴 리스트
-            Expanded(child: DailyRoutine(selectedDate: selectedDate,routineType: isDayMode ? 'night' : 'morning',)),
-
-            Divider(thickness: 1.2),
-            SizedBox(height: 20),
+            const Divider(thickness: 1.2),
+            const SizedBox(height: 20),
 
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 24.0),
               child: CustomBlueButton(
                 text: '루틴 추가하기',
-                onPressed: () {
-                  showModalBottomSheet(
+                onPressed: () async {
+                  final result = await showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
                     shape: RoundedRectangleBorder(
@@ -129,11 +130,15 @@ class _RoutineDetailPageState extends State<RoutineDetailPage> {
                       child: NewRoutineSheet(selectedDate: selectedDate),
                     ),
                   );
+
+                  if (result == true) {
+                    setState(() {});
+                    sliderKey.currentState?.refresh();
+                  }
                 },
               ),
             ),
-            SizedBox(height: 100),
-
+            const SizedBox(height: 100),
           ],
         ),
       ),

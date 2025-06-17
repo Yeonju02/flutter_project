@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:routinelogapp/main/routine_detail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import '../custom/routine_box.dart';
 import 'routine_edit.dart';
 
@@ -41,6 +43,29 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
     }
   }
 
+  TimeOfDay _parseTime(String? timeStr) {
+    if (timeStr == null || timeStr.trim().isEmpty) return TimeOfDay.now();
+    try {
+      final match = RegExp(r'(\d{1,2}):(\d{2})\s*([aApP][mM])').firstMatch(timeStr);
+      if (match == null) throw FormatException('시간 형식 아님: \$timeStr');
+      int hour = int.parse(match.group(1)!);
+      int minute = int.parse(match.group(2)!);
+      String ampm = match.group(3)!.toUpperCase();
+      if (ampm == 'PM' && hour != 12) hour += 12;
+      if (ampm == 'AM' && hour == 12) hour = 0;
+      return TimeOfDay(hour: hour, minute: minute);
+    } catch (_) {
+      return TimeOfDay(hour: 0, minute: 0);
+    }
+  }
+
+  int _toMinutes(TimeOfDay time) => time.hour * 60 + time.minute;
+
+  TimeOfDay _addMinutes(TimeOfDay time, int minutesToAdd) {
+    int totalMinutes = _toMinutes(time) + minutesToAdd;
+    return TimeOfDay(hour: totalMinutes ~/ 60 % 24, minute: totalMinutes % 60);
+  }
+
   Future<void> fetchRoutines() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId');
@@ -72,10 +97,9 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
       };
     }).toList();
 
-    // ⏱️ 클라이언트 정렬 (시간 파싱 후 정렬)
     routines.sort((a, b) {
-      final aVal = _timeValue(a['startTime']);
-      final bVal = _timeValue(b['startTime']);
+      final aVal = _toMinutes(_parseTime(a['startTime']));
+      final bVal = _toMinutes(_parseTime(b['startTime']));
       return aVal.compareTo(bVal);
     });
 
@@ -85,7 +109,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
 
     setState(() {
       routineList = routines;
-      isCheckedList = List.generate(routines.length, (_) => false);
+      isCheckedList = routines.map((routine) => routine['isFinished'] == true).toList();
       _controllers = List.generate(
         routines.length,
             (_) => AnimationController(vsync: this, duration: const Duration(milliseconds: 600)),
@@ -95,38 +119,90 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
           CurvedAnimation(parent: controller, curve: Curves.easeInOut),
         );
       }).toList();
+
+      for (int i = 0; i < routines.length - 1; i++) {
+        if (isCheckedList[i]) {
+          _controllers[i].forward();
+        }
+      }
     });
   }
 
-  // 🔧 AM/PM 시간 문자열을 정렬 가능한 숫자로 변환
-  int _timeValue(String? timeStr) {
-    if (timeStr == null) return 0;
+  void toggleCheck(int index) async {
+    final item = routineList[index];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selectedDay = DateTime(widget.selectedDate.year, widget.selectedDate.month, widget.selectedDate.day);
 
-    final match = RegExp(r'(\d{1,2}):(\d{2})\s*([aApP][mM])').firstMatch(timeStr);
-    if (match == null) return 0;
+    print('📆 오늘 날짜: $today');
+    print('📆 선택된 날짜: $selectedDay');
 
-    int hour = int.parse(match.group(1)!);
-    int minute = int.parse(match.group(2)!);
-    String ampm = match.group(3)!.toUpperCase();
+    if (selectedDay.isAfter(today)) {
+      print('🚫 미래 루틴 - 체크 불가');
+      Fluttertoast.showToast(
+        msg: "미래 루틴은 체크할 수 없습니다.",
+        gravity: ToastGravity.BOTTOM,
+        toastLength: Toast.LENGTH_SHORT,
+      );
+      return;
+    }
 
-    if (ampm == 'PM' && hour != 12) hour += 12;
-    if (ampm == 'AM' && hour == 12) hour = 0;
+    final nowTime = TimeOfDay.now();
+    final endTime = _parseTime(item['endTime']);
+    final nowMinutes = _toMinutes(nowTime);
+    final endMinutes = _toMinutes(endTime);
 
-    return hour * 60 + minute;
-  }
+    if (selectedDay.isAtSameMomentAs(today) && nowMinutes < endMinutes) {
+      Fluttertoast.showToast(
+        msg: "아직 루틴 수행 시간이 아닙니다.",
+        gravity: ToastGravity.BOTTOM,
+        toastLength: Toast.LENGTH_SHORT,
+      );
+      return;
+    }
 
-  void toggleCheck(int index) {
+    if (index > 0 && !isCheckedList[index - 1]) {
+      Fluttertoast.showToast(
+        msg: "이전 루틴을 먼저 완료해주세요.",
+        gravity: ToastGravity.BOTTOM,
+        toastLength: Toast.LENGTH_SHORT,
+      );
+      return;
+    }
+
+    final docId = item['docId'];
+    final deadline = _addMinutes(endTime, 10);
+    final deadlineMinutes = _toMinutes(deadline);
+    final isLate = nowMinutes > deadlineMinutes;
+
+    final willBeChecked = !isCheckedList[index];
+
     setState(() {
-      isCheckedList[index] = !isCheckedList[index];
+      isCheckedList[index] = willBeChecked;
+      routineList[index]['xpEarned'] = willBeChecked ? (isLate ? 0 : 10) : 0;
+
       if (index < _controllers.length - 1) {
-        if (isCheckedList[index]) {
+        if (willBeChecked) {
           _controllers[index].forward(from: 0);
         } else {
           _controllers[index].reset();
         }
       }
     });
+
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userDocId)
+        .collection('routineLogs')
+        .doc(docId)
+        .update({
+      'isFinished': willBeChecked,
+      'xpEarned': willBeChecked ? (isLate ? 0 : 10) : 0,
+    });
+
+    print('📤 Firestore 업데이트 완료');
   }
+
 
   @override
   void dispose() {
@@ -149,6 +225,15 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
       itemBuilder: (context, index) {
         final isChecked = isCheckedList[index];
         final item = routineList[index];
+        final xpEarned = item['xpEarned'] ?? 0;
+
+        final dotColor = isChecked
+            ? (xpEarned > 0 ? Colors.blue : Colors.red)
+            : Colors.grey.shade400;
+
+        final lineColor = isChecked
+            ? (xpEarned > 0 ? Colors.blue : Colors.red)
+            : Colors.grey.shade300;
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,7 +247,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
                   margin: const EdgeInsets.only(top: 8),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: isChecked ? Colors.blue : Colors.grey.shade400,
+                    color: dotColor,
                   ),
                 ),
                 if (index != routineList.length - 1)
@@ -181,7 +266,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
                               child: Container(
                                 width: 2,
                                 height: _lineAnimations[index].value,
-                                color: Colors.blue,
+                                color: lineColor,
                               ),
                             );
                           },
@@ -194,6 +279,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
             const SizedBox(width: 12),
             Expanded(
               child: RoutineBox(
+                routineId: item['docId'],
                 startTime: item['startTime'] ?? '',
                 endTime: item['endTime'] ?? '',
                 title: item['title'] ?? '',
@@ -203,8 +289,8 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
                 isChecked: isChecked,
                 onToggle: () => toggleCheck(index),
                 routineData: item,
-                onEdit: () {
-                  showModalBottomSheet(
+                onEdit: () async {
+                  final result = await showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
                     shape: const RoundedRectangleBorder(
@@ -216,6 +302,12 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
                       routineDocId: item['docId'],
                     ),
                   );
+                  if (result == true) {
+                    await fetchRoutines();
+
+                    final parentState = context.findAncestorStateOfType<RoutineDetailPageState>();
+                    parentState?.sliderKey.currentState?.refresh();
+                  }
                 },
               ),
             ),

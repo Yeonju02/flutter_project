@@ -31,6 +31,7 @@ class _RoutineEditDialogState extends State<RoutineEditDialog> {
   bool isEditingTitle = false;
   bool isEditingGoal = false;
   bool showTimeError = false;
+  bool showTimeOrderError = false;
 
   @override
   void initState() {
@@ -58,6 +59,12 @@ class _RoutineEditDialogState extends State<RoutineEditDialog> {
     } catch (_) {
       return TimeOfDay(hour: 0, minute: 0);
     }
+  }
+
+  bool _isStartTimeBeforeEndTime(TimeOfDay start, TimeOfDay end) {
+    final startMinutes = start.hour * 60 + start.minute;
+    final endMinutes = end.hour * 60 + end.minute;
+    return startMinutes < endMinutes;
   }
 
   void _showTimePicker({
@@ -110,7 +117,6 @@ class _RoutineEditDialogState extends State<RoutineEditDialog> {
     final title = titleController.text;
 
     try {
-      // 사용자 루틴 업데이트
       await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.userDocId)
@@ -149,12 +155,11 @@ class _RoutineEditDialogState extends State<RoutineEditDialog> {
         }
       }
 
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     } catch (e) {
       print('루틴 수정 실패: $e');
     }
   }
-
 
   Future<void> _deleteRoutine() async {
     try {
@@ -164,7 +169,8 @@ class _RoutineEditDialogState extends State<RoutineEditDialog> {
           .collection('routineLogs')
           .doc(widget.routineDocId)
           .delete();
-      Navigator.pop(context);
+
+      Navigator.pop(context, true);
     } catch (e) {
       print('루틴 삭제 실패: $e');
     }
@@ -262,14 +268,20 @@ class _RoutineEditDialogState extends State<RoutineEditDialog> {
                 style: TextStyle(color: Colors.red.shade700, fontSize: 14),
               ),
             ),
+          if (showTimeOrderError)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '시작 시간은 종료 시간보다 빨라야 해요.',
+                style: TextStyle(color: Colors.red.shade700, fontSize: 14),
+              ),
+            ),
+
           SizedBox(height: 30),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text('목표',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          ),
-          SizedBox(height: 10),
+
           // 목표
+          Align(alignment: Alignment.centerLeft, child: Text('목표', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+          SizedBox(height: 10),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -357,7 +369,13 @@ class _RoutineEditDialogState extends State<RoutineEditDialog> {
                   backgroundColor: Colors.blue.shade300,
                   padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
-                onPressed: _saveRoutine,
+                onPressed: () {
+                  setState(() {
+                    showTimeOrderError = !_isStartTimeBeforeEndTime(startTime, endTime);
+                  });
+                  if (showTimeOrderError) return;
+                  _saveRoutine();
+                },
                 child: Text('저장하기'),
               ),
               ElevatedButton(
