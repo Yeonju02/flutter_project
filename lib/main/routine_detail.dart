@@ -6,7 +6,7 @@ import 'package:flutter_switch/flutter_switch.dart';
 import 'daily_routine.dart';
 import '../custom/custom_blue_button.dart';
 import 'new_routine.dart';
-import 'night_routine_detail.dart'; // 밤 루틴 페이지 import
+import 'night_routine_detail.dart';
 
 class RoutineDetailPage extends StatefulWidget {
   final DateTime date;

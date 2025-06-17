@@ -103,7 +103,11 @@ class _AdminBoardPageState extends State<AdminBoardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('게시판 관리')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('게시판 관리', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: Colors.white,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
