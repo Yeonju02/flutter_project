@@ -1,3 +1,4 @@
+import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -5,8 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
-import 'package:flutter_linkify/flutter_linkify.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class BoardWriteScreen extends StatefulWidget {
   final Map<String, dynamic>? post;
@@ -150,90 +149,85 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
     }
   }
 
-  Widget _buildPreview() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('내용 미리보기', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Linkify(
-            text: _contentController.text,
-            onOpen: (link) async {
-              final url = Uri.parse(link.url);
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url, mode: LaunchMode.externalApplication);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('URL을 열 수 없습니다')),
-                );
-              }
-            },
-            style: const TextStyle(fontSize: 14),
-            linkStyle: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-          title: Text(isEditMode ? '글 수정' : '글 작성', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          backgroundColor: Colors.white,
+        title: Text(isEditMode ? '글 수정' : '글 작성', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: Colors.white,
       ),
       body: _isUploading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: ListView(
           children: [
             TextField(
               controller: _titleController,
               decoration: const InputDecoration(
                 labelText: '제목',
+                labelStyle: TextStyle(color: Colors.black),
                 border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF92BBE2), width: 2),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: '카테고리',
-                border: OutlineInputBorder(),
-              ),
-              items: _categories
-                  .map((category) => DropdownMenuItem(
-                value: category,
-                child: Text(category),
-              ))
-                  .toList(),
+            const SizedBox(height: 20),
+            DropdownButton2<String>(
+              isExpanded: true,
               value: _selectedCategory,
+              items: _categories.map((item) => DropdownMenuItem<String>(
+                value: item,
+                child: Text(item, style: const TextStyle(fontWeight: FontWeight.bold)),
+              )).toList(),
               onChanged: (value) {
                 setState(() {
                   _selectedCategory = value;
                 });
               },
+              buttonStyleData: ButtonStyleData(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFF92BBE2), width: 2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              dropdownStyleData: DropdownStyleData(
+                maxHeight: 160,
+                width: MediaQuery.of(context).size.width - 64,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF92BBE2)),
+                ),
+                offset: const Offset(0, -2), // 위치 조정
+              ),
+              iconStyleData: const IconStyleData(
+                icon: Icon(Icons.arrow_drop_down, color: Colors.black),
+              ),
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             TextField(
               controller: _contentController,
               maxLines: 8,
               decoration: const InputDecoration(
                 labelText: '내용',
+                labelStyle: TextStyle(color: Colors.black),
                 border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF92BBE2), width: 2),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            _buildPreview(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -246,16 +240,34 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.black,
+                side: const BorderSide(color: Color(0xFF92BBE2)),
+              ),
               onPressed: _pickImages,
               icon: const Icon(Icons.add_photo_alternate),
               label: const Text('이미지 추가'),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _submitBoard,
-              child: Text(isEditMode ? '수정 완료' : '작성 완료'),
+            const SizedBox(height: 28),
+            GestureDetector(
+              onTap: _submitBoard,
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF92BBE2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  isEditMode ? '수정 완료' : '작성 완료',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
