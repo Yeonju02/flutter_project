@@ -134,7 +134,11 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
     final today = DateTime(now.year, now.month, now.day);
     final selectedDay = DateTime(widget.selectedDate.year, widget.selectedDate.month, widget.selectedDate.day);
 
+    print('📆 오늘 날짜: $today');
+    print('📆 선택된 날짜: $selectedDay');
+
     if (selectedDay.isAfter(today)) {
+      print('🚫 미래 루틴 - 체크 불가');
       Fluttertoast.showToast(
         msg: "미래 루틴은 체크할 수 없습니다.",
         gravity: ToastGravity.BOTTOM,
@@ -145,8 +149,10 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
 
     final nowTime = TimeOfDay.now();
     final endTime = _parseTime(item['endTime']);
+    final nowMinutes = _toMinutes(nowTime);
+    final endMinutes = _toMinutes(endTime);
 
-    if (selectedDay.isAtSameMomentAs(today) && _toMinutes(nowTime) < _toMinutes(endTime)) {
+    if (selectedDay.isAtSameMomentAs(today) && nowMinutes < endMinutes) {
       Fluttertoast.showToast(
         msg: "아직 루틴 수행 시간이 아닙니다.",
         gravity: ToastGravity.BOTTOM,
@@ -166,12 +172,15 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
 
     final docId = item['docId'];
     final deadline = _addMinutes(endTime, 10);
-    final isLate = _toMinutes(nowTime) > _toMinutes(deadline);
+    final deadlineMinutes = _toMinutes(deadline);
+    final isLate = nowMinutes > deadlineMinutes;
 
     final willBeChecked = !isCheckedList[index];
 
     setState(() {
       isCheckedList[index] = willBeChecked;
+      routineList[index]['xpEarned'] = willBeChecked ? (isLate ? 0 : 10) : 0;
+
       if (index < _controllers.length - 1) {
         if (willBeChecked) {
           _controllers[index].forward(from: 0);
@@ -190,7 +199,10 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
       'isFinished': willBeChecked,
       'xpEarned': willBeChecked ? (isLate ? 0 : 10) : 0,
     });
+
+    print('📤 Firestore 업데이트 완료');
   }
+
 
   @override
   void dispose() {
@@ -267,6 +279,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
             const SizedBox(width: 12),
             Expanded(
               child: RoutineBox(
+                routineId: item['docId'],
                 startTime: item['startTime'] ?? '',
                 endTime: item['endTime'] ?? '',
                 title: item['title'] ?? '',
