@@ -117,25 +117,60 @@ class _AddProductPageState extends State<AddProductPage> {
             children: [
               TextFormField(
                 controller: nameController,
-                decoration: const InputDecoration(hintText: 'Product name'),
+                decoration: InputDecoration(
+                  hintText: '상품명',
+                  filled: true,
+                  fillColor: const Color(0xFFF0F4FA),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide.none,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                ),
                 validator: (value) => value!.isEmpty ? '상품명을 입력하세요' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: priceController,
-                decoration: const InputDecoration(hintText: 'Price'),
-                keyboardType: TextInputType.number,
-                validator: (value) => value!.isEmpty ? '가격을 입력하세요' : null,
+                decoration: InputDecoration(
+                  hintText: '가격',
+                  filled: true,
+                  fillColor: const Color(0xFFF0F4FA),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide.none,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                ),
+                validator: (value) => value!.isEmpty ? '가격명을 입력하세요' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: descController,
-                maxLines: 2,
-                decoration: const InputDecoration(hintText: 'Description'),
-                validator: (value) => value!.isEmpty ? '설명을 입력하세요' : null,
+                decoration: InputDecoration(
+                  hintText: '상품 설명',
+                  filled: true,
+                  fillColor: const Color(0xFFF0F4FA),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide.none,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                ),
+                validator: (value) => value!.isEmpty ? '상품 설명을 입력하세요' : null,
               ),
+
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: const Color(0xFFF0F4FA),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide.none,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
                 value: selectedMainCategory,
                 hint: const Text('Main Category'),
                 items: categoryMap.keys
@@ -154,6 +189,15 @@ class _AddProductPageState extends State<AddProductPage> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: const Color(0xFFF0F4FA),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide.none,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
                 value: selectedSubCategory,
                 hint: const Text('Sub Category'),
                 items: (selectedMainCategory != null)
@@ -248,12 +292,13 @@ class _AddProductPageState extends State<AddProductPage> {
               ElevatedButton(
                 onPressed: isUploading ? null : _submitProduct,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
+                  backgroundColor: const Color(0xFFA5C8F8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: isUploading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Add Product'),
+                    : const Text('상품 등록', style: TextStyle(color: Colors.white)),
               ),
             ],
           ),

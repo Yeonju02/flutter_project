@@ -168,9 +168,11 @@ class _SignupPageState extends State<SignupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        leading: BackButton(),
-        title: Text('회원가입'),
+        leading: const BackButton(color: Colors.black),
+        title: const Text('회원가입', style: TextStyle(color: Colors.black)),
+        backgroundColor: Colors.white,
         elevation: 0,
       ),
       body: SafeArea(
@@ -280,10 +282,19 @@ class _SignupPageState extends State<SignupPage> {
                 ],
               ),
 
-              SizedBox(height: 12),
-              CustomBlueButton(
-                text: '회원가입',
-                onPressed: _handleSignup,
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _handleSignup,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFA5C8F8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  child: const Text('회원가입', style: TextStyle(color: Colors.white, fontSize: 16)),
+                ),
               ),
             ],
           ),
@@ -297,14 +308,20 @@ class _SignupPageState extends State<SignupPage> {
     required TextEditingController controller,
     bool obscure = false,
   }) {
-    return TextField(
-      controller: controller,
-      obscureText: obscure,
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F7FA),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscure,
+        decoration: InputDecoration(
+          hintText: hint,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        ),
       ),
     );
   }
@@ -325,17 +342,17 @@ class _SignupPageState extends State<SignupPage> {
 
   Widget _buildSmallButton(String text, {required VoidCallback onPressed}) {
     return SizedBox(
-      height: 48,
+      height: 44,
       child: ElevatedButton(
+        onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF92BBE2),
+          backgroundColor: const Color(0xFFA5C8F8),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
-        onPressed: onPressed,
-        child: Text(text),
+        child: Text(text, style: const TextStyle(fontSize: 14)),
       ),
     );
   }

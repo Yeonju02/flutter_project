@@ -58,9 +58,15 @@ class _AdminProductPageState extends State<AdminProductPage> {
                 Expanded(
                   flex: 3,
                   child: TextField(
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Product name',
-                      border: OutlineInputBorder(),
+                      filled: true,
+                      fillColor: const Color(0xFFF0F4FA),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                   ),
                 ),
@@ -98,7 +104,7 @@ class _AdminProductPageState extends State<AdminProductPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3173F6)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFA5C8F8)),
                 onPressed: () {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const AddProductPage()));
                 },
@@ -107,13 +113,16 @@ class _AdminProductPageState extends State<AdminProductPage> {
             ),
             const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
-              color: Colors.grey.shade200,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F4FA),
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: const Row(
                 children: [
-                  Expanded(flex: 4, child: Text('Product')),
-                  Expanded(flex: 2, child: Text('Price')),
-                  Expanded(flex: 2, child: Text('Stock')),
+                  Expanded(flex: 4, child: Text('Product', style: TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(flex: 2, child: Text('Price', style: TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(flex: 2, child: Text('Stock', style: TextStyle(fontWeight: FontWeight.bold))),
                 ],
               ),
             ),
