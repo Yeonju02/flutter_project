@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dialogs/timer_dialog.dart';
+import '../../utils/class/global_timer_manager.dart';
 
 class RoutineBox extends StatelessWidget {
+  final String routineId;
   final String startTime;
   final String endTime;
   final String title;
@@ -14,6 +17,7 @@ class RoutineBox extends StatelessWidget {
 
   const RoutineBox({
     super.key,
+    required this.routineId,
     required this.startTime,
     required this.endTime,
     required this.title,
@@ -26,11 +30,29 @@ class RoutineBox extends StatelessWidget {
     required this.routineData,
   });
 
+  int _toMinutes(TimeOfDay time) => time.hour * 60 + time.minute;
+
+  TimeOfDay _parseTime(String? timeStr) {
+    if (timeStr == null || timeStr.trim().isEmpty) return TimeOfDay.now();
+    try {
+      final match = RegExp(r'(\d{1,2}):(\d{2})\s*([aApP][mM])').firstMatch(timeStr);
+      if (match == null) throw FormatException('시간 형식 아님: $timeStr');
+      int hour = int.parse(match.group(1)!);
+      int minute = int.parse(match.group(2)!);
+      String ampm = match.group(3)!.toUpperCase();
+      if (ampm == 'PM' && hour != 12) hour += 12;
+      if (ampm == 'AM' && hour == 12) hour = 0;
+      return TimeOfDay(hour: hour, minute: minute);
+    } catch (_) {
+      return TimeOfDay(hour: 0, minute: 0);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final Color baseColor = Colors.grey.shade100;
-    final Color blueColor = Color(0xFF92BBE2);
-    final Color redColor = Color(0xFFFFCCCC);
+    final Color blueColor = const Color(0xFF92BBE2);
+    final Color redColor = const Color(0xFFFFCCCC);
 
     final int xpEarned = routineData['xpEarned'] ?? 0;
 
@@ -43,55 +65,72 @@ class RoutineBox extends StatelessWidget {
     return GestureDetector(
       onTap: onEdit,
       child: AnimatedContainer(
-        duration: Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 400),
         curve: Curves.easeInOut,
-        margin: EdgeInsets.only(bottom: 12),
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(15),
         ),
         child: Row(
           children: [
             Text(
-              '$startTime ~ $endTime',
+              '$startTime  $title',
               style: TextStyle(
-                fontWeight: FontWeight.bold,
+                fontSize: 16,
                 color: textColor,
+                fontWeight: FontWeight.bold
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () {
+                final start = _parseTime(startTime);
+                final end = _parseTime(endTime);
+                final durationSeconds = (_toMinutes(end) - _toMinutes(start)) * 60;
+
+                final isRunning = GlobalTimerManager.instance.isRunning(routineId);
+                final remainingSeconds = GlobalTimerManager.instance.getRemainingSeconds(routineId);
+                final isTimerInitialized = GlobalTimerManager.instance.getOriginalDuration(routineId) > 0;
+
+                showTimerDialog(
+                  context,
+                  routineId,
+                  title: title,
+                  startTime: startTime,
+                  endTime: endTime,
+                  initialSeconds: isRunning || isTimerInitialized ? remainingSeconds : durationSeconds,
+                  isInitiallyRunning: isRunning,
+                );
+              },
+              child: const Padding(
+                padding: EdgeInsets.only(right: 12),
+                child: Icon(Icons.timer, size: 18, color: Colors.black54),
               ),
             ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: textColor,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ),
-            SizedBox(width: 8),
+
             GestureDetector(
               onTap: isChecked ? null : onToggle,
               child: Container(
                 width: 22,
                 height: 22,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white,
                 ),
                 child: AnimatedSwitcher(
-                  duration: Duration(milliseconds: 300),
+                  duration: const Duration(milliseconds: 300),
                   transitionBuilder: (child, animation) {
                     return ScaleTransition(scale: animation, child: child);
                   },
                   child: isChecked
                       ? (xpEarned > 0
-                      ? Icon(Icons.check, key: ValueKey('check'), size: 18, color: blueColor)
-                      : Icon(Icons.close, key: ValueKey('close'), size: 18, color: Colors.red))
-                      : Icon(Icons.circle_outlined, key: ValueKey('none'), size: 18, color: Colors.grey),
+                      ? Icon(Icons.check, key: const ValueKey('check'), size: 18, color: blueColor)
+                      : Icon(Icons.close, key: const ValueKey('close'), size: 18, color: Colors.red))
+                      : const Icon(Icons.circle_outlined, key: ValueKey('none'), size: 18, color: Colors.grey),
                 ),
               ),
             ),

@@ -138,7 +138,7 @@ class _MainPageState extends State<MainPage> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: 30,  // 이거 안하면 너무 아래에 딱 붙는듯
             child: BottomNavBar(
               currentIndex: 2,
               onTap: (index) {
