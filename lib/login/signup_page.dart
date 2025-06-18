@@ -155,7 +155,8 @@ class _SignupPageState extends State<SignupPage> {
         'deleted': false,
         'notiEnable': true,
         'address': '',
-        'imgPath': ''
+        'imgPath': '',
+        'status' : 'U'
       });
 
       _showToast("회원가입 완료!");
