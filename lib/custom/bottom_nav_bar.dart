@@ -86,9 +86,9 @@ class BottomNavBar extends StatelessWidget {
   IconData _iconData(int index) {
     switch (index) {
       case 0:
-        return Icons.attach_money;
+        return Icons.shopping_bag_outlined;
       case 1:
-        return Icons.check_box;
+        return Icons.article_outlined;
       case 3:
         return Icons.notifications_none;
       case 4:
