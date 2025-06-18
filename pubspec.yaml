@@ -54,6 +54,7 @@ dependencies:
   flutter_local_notifications:
   permission_handler:
   dropdown_button2: ^2.3.9
+  flutter_shake_animated:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
 
@@ -94,7 +95,11 @@ flutter:
     - assets/rising_moon.PNG
     - assets/img.png
     - assets/moon_background.png
-
+    - assets/moon_background1.png
+    - assets/moon_background2.png
+    - assets/sleep_cycle_graph.png
+    - assets/point_box.png
+    - assets/used_point_box.png
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

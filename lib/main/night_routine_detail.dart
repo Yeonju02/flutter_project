@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'routine_detail.dart';
 import '../custom/night_date_slider.dart';
-import 'daily_routine.dart';
+import 'night_daily_routine.dart';
 import '../custom/custom_gery_button.dart';
-import 'new_routine.dart';
+import 'new_night_routine.dart';
 import 'package:flutter_switch/flutter_switch.dart';
 
 class NightRoutineDetailPage extends StatefulWidget {
@@ -23,34 +23,50 @@ class _NightRoutineDetailPageState extends State<NightRoutineDetailPage>
   late final AnimationController _controller;
   late final Animation<Offset> _animation;
 
+  late final AnimationController _fadeController;  // 달 뒷쪽 빛무리 연출용
+  late final Animation<double> _fadeAnimation;  // 달 뒷쪽 빛무리 연출용
+
   @override
   void initState() {
     super.initState();
-    selectedDate = widget.date;
+    selectedDate = widget.date; // 날짜 초기화
 
-    // 달 슬라이드 애니메이션 설정
-    _controller = AnimationController(
+    _controller = AnimationController( // 달 애니메이션용
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
 
-    _animation = Tween<Offset>(
-      begin: const Offset(0, 1), // 아래에서 시작
-      end: Offset.zero,          // 원래 위치로 이동
+    _animation = Tween<Offset>( // 달 애니메이션용
+      begin: const Offset(0, 1),
+      end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _controller,
       curve: Curves.easeOut,
     ));
 
-    // 페이지 진입 후 살짝 딜레이 주고 애니메이션 실행
-    Future.delayed(const Duration(milliseconds: 200), () {
-      _controller.forward();
+    _fadeController = AnimationController( // 달 뒷배경 애니메이션
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = CurvedAnimation( // 달 뒷배경
+      parent: _fadeController,
+      curve: Curves.easeIn,
+    );
+
+    // 달 먼저 움직이고 빛무리 생김
+    Future.delayed(const Duration(milliseconds: 200), () async {
+      await _controller.forward(); // 달 애니메이션
+      await _fadeController.forward(); // 달 빛무리
     });
   }
+
+
 
   @override
   void dispose() {
     _controller.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
@@ -145,11 +161,16 @@ class _NightRoutineDetailPageState extends State<NightRoutineDetailPage>
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        //Image.asset(
-                        //  'assets/moon_background.png',
-                        //  width: 250,
-                        //  fit: BoxFit.cover,
-                        //),
+                        // 달 뒷면 빛무리 애니메이션
+                        FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: Image.asset(
+                            'assets/moon_background2.png',
+                            width: 300,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        // 달 이미지
                         Image.asset(
                           'assets/rising_moon.PNG',
                           width: 250,
@@ -187,10 +208,9 @@ class _NightRoutineDetailPageState extends State<NightRoutineDetailPage>
               const SizedBox(height: 20),
 
               Expanded(
-                child: DailyRoutine(
+                child: NightDailyRoutine(
                   key: UniqueKey(),
                   selectedDate: selectedDate,
-                  routineType: 'night',
                 ),
               ),
 
@@ -212,7 +232,7 @@ class _NightRoutineDetailPageState extends State<NightRoutineDetailPage>
                         padding: EdgeInsets.only(
                           bottom: MediaQuery.of(context).viewInsets.bottom,
                         ),
-                        child: NewRoutineSheet(selectedDate: selectedDate),
+                        child: NewNightRoutineSheet(selectedDate: selectedDate),
                       ),
                     );
 

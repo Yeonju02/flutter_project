@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import '../main/main_page.dart';
 class XPLevelBar extends StatefulWidget {
   const XPLevelBar({super.key});
 
@@ -9,7 +9,7 @@ class XPLevelBar extends StatefulWidget {
   State<XPLevelBar> createState() => _XPLevelBarState();
 }
 
-class _XPLevelBarState extends State<XPLevelBar> {
+class _XPLevelBarState extends State<XPLevelBar> with RouteAware {
   int xp = 0;
   int level = 0;
   bool isLoading = true;
@@ -20,7 +20,28 @@ class _XPLevelBarState extends State<XPLevelBar> {
     _loadXPLevel();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // 다른 페이지에서 돌아왔을 때
+    _loadXPLevel();
+  }
+
   Future<void> _loadXPLevel() async {
+    setState(() => isLoading = true);
+
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId');
 
@@ -51,7 +72,7 @@ class _XPLevelBarState extends State<XPLevelBar> {
   Widget build(BuildContext context) {
     if (isLoading) return const SizedBox(height: 20);
 
-    double progress = (xp % 100) / 100.0; // 100XP 기준 레벨업
+    double progress = (xp % 100) / 100.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
