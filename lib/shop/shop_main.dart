@@ -59,6 +59,7 @@ class _ShopMainPageState extends State<ShopMainPage> {
       backgroundColor : Colors.white,
       appBar: AppBar(
           automaticallyImplyLeading: false,
+          title: Text('쇼핑몰', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           backgroundColor: Colors.white
       ),
       body: Stack(
@@ -251,89 +252,85 @@ class _ShopMainPageState extends State<ShopMainPage> {
                 child: CircularProgressIndicator(color: Colors.white),
               ),
             ),
+          Positioned(
+            bottom: 30,
+            left: 0,
+            right: 0,
+            child: BottomNavBar(
+              currentIndex: _currentIndex,
+              onTap: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+
+                switch (index) {
+                  case 0:
+                    break; // 현재 페이지
+                  case 1:
+                    Navigator.pushReplacement(context,
+                        MaterialPageRoute(builder: (context) => BoardMainScreen()));
+                    break;
+                  case 2:
+                    Navigator.pushReplacement(context,
+                        MaterialPageRoute(builder: (context) => MainPage()));
+                    break;
+                  case 3:
+                    Navigator.pushReplacement(context,
+                        MaterialPageRoute(builder: (context) => NotificationScreen()));
+                    break;
+                  case 4:
+                    Navigator.pushReplacement(context,
+                        MaterialPageRoute(builder: (context) => MyPageMain()));
+                    break;
+                }
+              },
+            ),
+          ),
+          Positioned(
+            bottom: 130,
+            right: 20,
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(userId!)
+                  .collection('cart')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                int cartCount = snapshot.data?.docs.length ?? 0;
+                return Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    FloatingActionButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => CartPage(userId: userId!)),
+                        );
+                      },
+                      backgroundColor: const Color(0xFF92BBE2),
+                      child: const Icon(Icons.shopping_cart, color: Colors.white),
+                    ),
+                    if (cartCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                          child: Text(
+                            '$cartCount',
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
         ],
       ),
 
-      // 장바구니 버튼
-      floatingActionButton: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId!)
-            .collection('cart')
-            .snapshots(),
-        builder: (context, snapshot) {
-          int cartCount = snapshot.data?.docs.length ?? 0;
-          return Stack(
-            alignment: Alignment.topRight,
-            children: [
-              FloatingActionButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => CartPage(userId: userId!)),
-                  );
-                },
-                backgroundColor: Color(0xFF92BBE2),
-                child: const Icon(Icons.shopping_cart, color: Colors.white),
-              ),
-              if (cartCount > 0)
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                    child: Text(
-                      '$cartCount',
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-
-      // 하단 네비게이션 바
-      bottomNavigationBar: BottomNavBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-
-          // 👉 직접 위젯으로 이동
-          switch (index) {
-            case 0:
-            // 현재 페이지 (ShopMainPage) → 아무 동작 없음
-              break;
-            case 1:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => BoardMainScreen()),
-              );
-              break;
-            case 2:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => MainPage()), // 홈
-              );
-              break;
-            case 3:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => NotificationScreen()), // 알림
-              );
-              break;
-            case 4:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => MyPageMain()), // 마이페이지
-              );
-              break;
-          }
-        },
-      ),
     );
   }
 }
