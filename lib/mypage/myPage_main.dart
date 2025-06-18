@@ -10,12 +10,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:routinelogapp/notification/notification_screen.dart';
 
 import '../login/login_page.dart';
 import '../board/board_main_screen.dart';
 import '../main/main_page.dart';
 import '../shop/shop_main.dart';
+import '../admin/admin_product_page.dart';
+import '../notification/notification_screen.dart';
 import 'delivery_address.dart';
 import 'privacy_policy_page.dart';
 
@@ -63,10 +64,10 @@ class _MyPageMainState extends State<MyPageMain> {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         final doc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get();
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
         if (doc.exists) {
           setState(() {
             userData = doc.data();
@@ -85,7 +86,22 @@ class _MyPageMainState extends State<MyPageMain> {
     }
   }
 
-  // 배송 대기, 배송 완료 목록 가져오기
+  String _getImageBySelectedColor(List<dynamic>? colorsList, String selectedColor) {
+    if (colorsList == null || colorsList.isEmpty) return '';
+
+    for (final colorMap in colorsList) {
+      if (colorMap is Map<String, dynamic>) {
+        final color = (colorMap['color'] ?? '').toString().toLowerCase();
+        if (color == selectedColor.toLowerCase()) {
+          return (colorMap['imgPath'] ?? '').toString().trim();
+        }
+      }
+    }
+    // 해당 색상 이미지 없으면 첫번째 색상 이미지 반환
+    return (colorsList[0]['imgPath'] ?? '').toString().trim();
+  }
+
+// 결제 완료 + 취소 목록 가져오기
   Future<List<Map<String, dynamic>>> fetchOrderList(bool isCompleted) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
@@ -95,40 +111,83 @@ class _MyPageMainState extends State<MyPageMain> {
         .doc(user.uid)
         .collection('orders');
 
-    Query query;
-
-    if (isCompleted) {
-      query = ordersRef.where('status', isEqualTo: '배송완료');
-    } else {
-      query = ordersRef.where('status', whereIn: ['결제완료', '배송중']);
-    }
+    final query = isCompleted
+        ? ordersRef.where('status', isEqualTo: '배송완료')
+        : ordersRef.where('status', whereIn: ['결제완료', '취소됨']);
 
     final snapshot = await query.get();
-
     List<Map<String, dynamic>> results = [];
 
     for (var doc in snapshot.docs) {
       final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
       final productId = data['productId'];
+      final selectedColor = (data['selectedColor'] ?? '').toString();
 
-      // 상품 정보 가져오기
       final productDoc = await FirebaseFirestore.instance
-          .collection('product')
+          .collection('products')
           .doc(productId)
           .get();
 
       final productData = productDoc.data();
 
       if (productData != null) {
+        final colorsList = productData['colors'] as List<dynamic>?;
+
+        final imgPath = _getImageBySelectedColor(colorsList, selectedColor);
+
         results.add({
           ...data,
-          'productName': productData['productName'],
-          'productPrice': productData['productPrice'],
-          'productImage': productData['imgPath'], // 이미지 경로도 추가
+          'documentId': doc.id,
+          'productName': productData['productName'] ?? '',
+          'productPrice': productData['productPrice'] ?? 0,
+          'productImage': imgPath.startsWith('http') ? imgPath : '',
         });
       }
     }
+    return results;
+  }
 
+  // 배송 완료 목록 가져오기
+  Future<List<Map<String, dynamic>>> fetchCompletedOrderList() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return [];
+
+    final ordersRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('orders');
+
+    final query = ordersRef.where('status', isEqualTo: '배송완료');
+
+    final snapshot = await query.get();
+    List<Map<String, dynamic>> results = [];
+
+    for (var doc in snapshot.docs) {
+      final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      final productId = data['productId'];
+      final selectedColor = (data['selectedColor'] ?? '').toString();
+
+      final productDoc = await FirebaseFirestore.instance
+          .collection('products')
+          .doc(productId)
+          .get();
+
+      final productData = productDoc.data();
+
+      if (productData != null) {
+        final colorsList = productData['colors'] as List<dynamic>?;
+
+        final imgPath = _getImageBySelectedColor(colorsList, selectedColor);
+
+        results.add({
+          ...data,
+          'documentId': doc.id,
+          'productName': productData['productName'] ?? '',
+          'productPrice': productData['productPrice'] ?? 0,
+          'productImage': imgPath.startsWith('http') ? imgPath : '',
+        });
+      }
+    }
     return results;
   }
 
@@ -158,7 +217,8 @@ class _MyPageMainState extends State<MyPageMain> {
   String? originalImagePath; // 이미지 미리보기
 
   // 2. 이미지 선택 함수 (Firebase 업로드 X)
-  Future<void> pickImageOnly(void Function(void Function()) setDialogState) async {
+  Future<void> pickImageOnly(
+      void Function(void Function()) setDialogState) async {
     final picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
@@ -176,7 +236,8 @@ class _MyPageMainState extends State<MyPageMain> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final userDocRef = FirebaseFirestore.instance.collection('users').doc(
+        user.uid);
     final settingsDocRef = userDocRef.collection('notiSettings').doc('main');
 
     // notiEnable은 이미 생성된 값이라 그대로 가져옴
@@ -205,7 +266,6 @@ class _MyPageMainState extends State<MyPageMain> {
 
     setState(() {});
   }
-
 
 
   Future<void> _updateNotiEnable(bool enable) async {
@@ -296,7 +356,6 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
 
-
   // 회원탈퇴 ( 삭제 기능 x delete만 true로 변경함 )
   void _showDeleteAccountDialog() {
     final TextEditingController passwordController = TextEditingController();
@@ -309,7 +368,8 @@ class _MyPageMainState extends State<MyPageMain> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               child: SizedBox(
                 width: 350,
                 child: Padding(
@@ -325,7 +385,8 @@ class _MyPageMainState extends State<MyPageMain> {
                           children: [
                             Text(
                               "회원 탈퇴",
-                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                  fontSize: 20, fontWeight: FontWeight.bold),
                             ),
                             IconButton(
                               icon: Icon(Icons.close),
@@ -354,7 +415,9 @@ class _MyPageMainState extends State<MyPageMain> {
                           ),
                           onChanged: (val) {
                             setDialogState(() {
-                              isPasswordValid = val.trim().length >= 6;
+                              isPasswordValid = val
+                                  .trim()
+                                  .length >= 6;
                             });
                           },
                         ),
@@ -365,7 +428,8 @@ class _MyPageMainState extends State<MyPageMain> {
                           width: double.infinity,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: isPasswordValid ? Color(0xFFEF4444) : Colors.grey.shade400,
+                              backgroundColor: isPasswordValid ? Color(
+                                  0xFFEF4444) : Colors.grey.shade400,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -418,7 +482,8 @@ class _MyPageMainState extends State<MyPageMain> {
       barrierDismissible: false,
       builder: (context) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
           child: SizedBox(
             width: 350,
             child: Padding(
@@ -433,7 +498,8 @@ class _MyPageMainState extends State<MyPageMain> {
                     children: [
                       Text(
                         "로그아웃",
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       IconButton(
                         icon: Icon(Icons.close),
@@ -508,12 +574,12 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
 
-
   Future<bool> _tryDeleteAccount(String password) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
 
-    final cred = EmailAuthProvider.credential(email: user.email!, password: password);
+    final cred = EmailAuthProvider.credential(
+        email: user.email!, password: password);
 
     try {
       // 재인증 시도 (비밀번호 확인)
@@ -616,10 +682,8 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
   // 2) 프로필 편집 내용 빌드 함수
-  Widget buildProfileEditContent(
-    BuildContext context,
-    void Function(void Function()) setDialogState,
-  ) {
+  Widget buildProfileEditContent(BuildContext context,
+      void Function(void Function()) setDialogState,) {
     final originalNickname = nicknameController.text;
     final originalEmail = emailController.text;
     final originalImgPath = userData?['imgPath'];
@@ -680,18 +744,18 @@ class _MyPageMainState extends State<MyPageMain> {
                       child: CircleAvatar(
                         radius: 40,
                         backgroundImage:
-                            pickedImage != null
-                                ? FileImage(File(pickedImage!.path))
-                                : (originalImgPath != null &&
-                                        originalImgPath != ''
-                                    ? NetworkImage(originalImgPath)
-                                    : null),
+                        pickedImage != null
+                            ? FileImage(File(pickedImage!.path))
+                            : (originalImgPath != null &&
+                            originalImgPath != ''
+                            ? NetworkImage(originalImgPath)
+                            : null),
                         child:
-                            pickedImage == null &&
-                                    (originalImgPath == null ||
-                                        originalImgPath == '')
-                                ? Icon(Icons.person, size: 40)
-                                : null,
+                        pickedImage == null &&
+                            (originalImgPath == null ||
+                                originalImgPath == '')
+                            ? Icon(Icons.person, size: 40)
+                            : null,
                       ),
                     ),
                     Positioned(
@@ -824,7 +888,6 @@ class _MyPageMainState extends State<MyPageMain> {
 
   /////// - 내 게시물이 보일 부분 - ///////
 
-
   // 내 게시물 콘텐츠
   Widget myPost() {
     if (myPosts.isEmpty) {
@@ -894,12 +957,12 @@ class _MyPageMainState extends State<MyPageMain> {
         margin: EdgeInsets.only(bottom: 16),
         height: 150,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.grey[200]!,
-            width: 1
-          )
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: Colors.grey[200]!,
+                width: 1
+            )
         ),
         child: Row(
           children: [
@@ -907,14 +970,16 @@ class _MyPageMainState extends State<MyPageMain> {
             Expanded(
               flex: 2, // 너비 비율 조정
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 12),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       post['title'] ?? '',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -971,12 +1036,29 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
 
-
-
   /////// - 주문 내역 - ///////
 
   // 내 주문 내역이 보일 영역
   Widget _orderHistory() {
+
+    orderList.sort((a, b) {
+      if (a['status'] == b['status']) return 0;
+      if (a['status'] == '취소됨') return 1; // 취소됨은 뒤로
+      if (b['status'] == '취소됨') return -1;
+      return 0;
+    });
+
+    final pendingOrders = orderList
+        .where((order) => order['status'] == '결제완료' || order['status'] == '취소됨')
+        .toList();
+
+    final completedOrders = orderList
+        .where((order) => order['status'] == '배송완료')
+        .toList();
+
+    final showList = selectedDeliveryTab == 0 ? pendingOrders : completedOrders;
+
+
     return Column(
       children: [
         SizedBox(height: 16),
@@ -992,21 +1074,62 @@ class _MyPageMainState extends State<MyPageMain> {
         Expanded(
           child: isLoading
               ? Center(child: Text("로딩중..."))
-              : orderList.isEmpty
-              ? _buildEmptyOrderView()
+              : showList.isEmpty
+              ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.shopping_cart_outlined, size: 72, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  selectedDeliveryTab == 0
+                      ? "주문 내역이 없습니다."
+                      : "배송 완료된 상품이 없습니다.",
+                  style: TextStyle(fontSize: 16, color: Colors.black54),
+                ),
+                SizedBox(height: 20),
+                if (selectedDeliveryTab == 0) // 배송 대기 탭일 때만 버튼 표시
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ShopMainPage()),
+                      );
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF272727),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Color(0xFF272727), width: 1.5),
+                      ),
+                      child: Text(
+                        "쇼핑하러 가기",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          )
               : ListView.builder(
-            itemCount: orderList.length,
+            itemCount: showList.length,
             itemBuilder: (context, index) {
-              final order = orderList[index];
-              return order['status'] == '결제완료'
+              final order = showList[index];
+              return selectedDeliveryTab == 0
                   ? _buildPendingOrderItem(order)
                   : _buildCompletedOrderItem(order);
             },
           ),
         ),
+
       ],
     );
   }
+
 
   double _getProgress(String status) {
     switch (status) {
@@ -1021,8 +1144,36 @@ class _MyPageMainState extends State<MyPageMain> {
     }
   }
 
-
+  // 결제완료 + 취소됨 주문 대기 리스트
   Widget _buildPendingOrderItem(Map<String, dynamic> order) {
+    final imgUrl = (order['productImage'] ?? '').toString().trim();
+    final hasImage = imgUrl.isNotEmpty && imgUrl.startsWith('http');
+    final status = order['status'] ?? '';
+    final selectedColor = order['selectedColor'] ?? '';
+
+    Color _statusColor(String target) {
+      if (status == '결제완료') {
+        return target == '결제완료' ? Colors.black : Colors.grey.shade300;
+      } else if (status == target) {
+        return Colors.black;
+      } else {
+        return Colors.grey.shade300;
+      }
+    }
+
+    double _getProgress(String status) {
+      switch (status) {
+        case '결제완료':
+          return 0.33;
+        case '배송중':
+          return 0.66;
+        case '배송완료':
+          return 1.0;
+        default:
+          return 0.0;
+      }
+    }
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       padding: EdgeInsets.all(16),
@@ -1038,60 +1189,105 @@ class _MyPageMainState extends State<MyPageMain> {
         children: [
           Row(
             children: [
-              Image.network(order['productImage'], width: 60, height: 60, fit: BoxFit.cover),
+              hasImage
+                  ? Image.network(
+                imgUrl,
+                width: 60,
+                height: 60,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(Icons.broken_image, size: 60);
+                },
+              )
+                  : Container(
+                width: 60,
+                height: 60,
+                color: Colors.grey[300],
+                child: Icon(Icons.image_not_supported),
+              ),
               SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(order['productName'], style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      order['productName'] ?? '상품명 없음',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
                     SizedBox(height: 4),
-                    Text("상세 정보", style: TextStyle(color: Colors.grey)),
+                    if (selectedColor.isNotEmpty)
+                      Text("선택한 옵션: $selectedColor",
+                          style: TextStyle(color: Colors.grey[700])),
+                    SizedBox(height: 2),
                   ],
                 ),
               ),
-              Text("${order['productPrice']} 원", style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                "${order['productPrice'] ?? '0'} 원",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ],
           ),
-          SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("배송 대기", style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: order['status'] == '결제완료' ? Colors.black : Colors.grey,
-              )),
-              Text("배송중", style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: order['status'] == '배송중' ? Colors.black : Colors.grey,
-              )),
-              Text("배송 완료", style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: order['status'] == '배송완료' ? Colors.black : Colors.grey,
-              )),
-            ],
-          ),
-          SizedBox(height: 4),
-          LinearProgressIndicator(
-            value: _getProgress(order['status']),
-            color: Colors.black87,
-            backgroundColor: Colors.grey.shade300,
-          ),
+          SizedBox(height: 30),
 
-          SizedBox(height: 8),
-          Center(
-            child: TextButton(
-              onPressed: () {
-                // 주문 취소 로직
-              },
-              child: Text("주문 취소하기", style: TextStyle(color: Colors.red)),
+          // status가 '취소됨'일 경우 UI 분기 처리
+          if (status == '취소됨') ...[
+            Align(
+              alignment: Alignment.centerLeft, // 왼쪽 정렬
+              child: Text(
+                "주문 취소중",
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
             ),
-          ),
+            SizedBox(height: 20,)
+          ] else
+            ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("배송 대기",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _statusColor('결제완료'),
+                      )),
+                  Text("배송중",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _statusColor('배송중'),
+                      )),
+                  Text("배송 완료",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _statusColor('배송완료'),
+                      )),
+                ],
+              ),
+              SizedBox(height: 15),
+              LinearProgressIndicator(
+                value: _getProgress(status),
+                color: Colors.black87,
+                backgroundColor: Colors.grey.shade300,
+              ),
+              SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: () =>
+                      showCancelOrderDialog(context, order['documentId']),
+                  child: Text("주문 취소하기", style: TextStyle(color: Colors.red)),
+                ),
+              ),
+            ],
         ],
       ),
     );
   }
 
+  // 배송 완료되자마자 보일 주문 완료 리스트
   Widget _buildCompletedOrderItem(Map<String, dynamic> order) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1106,40 +1302,65 @@ class _MyPageMainState extends State<MyPageMain> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          /// 상단 상태 및 교환/환불
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Image.network(order['productImage'], width: 60, height: 60, fit: BoxFit.cover),
+              Text("배송 완료", style: TextStyle(fontSize: 12)),
+              TextButton(
+                onPressed: () {
+                  // 교환/환불 로직
+                },
+                child: Text("교환/환불 신청", style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Image.network(
+                order['productImage'],
+                width: 60,
+                height: 60,
+                fit: BoxFit.cover,
+              ),
               SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("배송 완료", style: TextStyle(fontSize: 12)),
-                        Spacer(),
-                        TextButton(
-                          onPressed: () {
-                            // 교환/환불 로직
-                          },
-                          child: Text("교환/환불 신청", style: TextStyle(color: Colors.red)),
+                        Expanded(
+                          child: Text(
+                            order['productName'],
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          "${order['productPrice']} 원",
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
-                    Text(order['productName'], style: TextStyle(fontWeight: FontWeight.bold)),
                     SizedBox(height: 4),
                     Text("상세 정보", style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
-              Text("${order['productPrice']} 원", style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           SizedBox(height: 12),
+
           Center(
             child: ElevatedButton(
               onPressed: () {
-                // 리뷰 작성 로직
+                showReviewDialog(context, order);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black87,
@@ -1157,45 +1378,320 @@ class _MyPageMainState extends State<MyPageMain> {
     );
   }
 
-  Widget _buildEmptyOrderView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.shopping_cart_outlined, size: 72, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
-            "배송 내역이 없습니다.",
-            style: TextStyle(fontSize: 16, color: Colors.black54),
-          ),
-          SizedBox(height: 20),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ShopMainPage()),
+  // 주문 취소 다이얼로그
+  void showCancelOrderDialog(BuildContext context, String documentId) {
+    final TextEditingController reasonController = TextEditingController();
+    final List<String> cancelReasons = [
+      '단순 변심',
+      '배송 지연',
+      '상품이 예상과 다름',
+      '상품 불량',
+      '기타',
+    ];
+    String selectedReason = '단순 변심';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) =>
+          StatefulBuilder(
+            builder: (context, setState) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery
+                      .of(context)
+                      .viewInsets
+                      .bottom,
+                  left: 16,
+                  right: 16,
+                  top: 20,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 헤더
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('주문 취소하기', style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                          IconButton(
+                            icon: Icon(Icons.close),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+
+                      Text('주문 취소 이유를 선택해주세요. \n주문 취소 시 결제 계좌로 자동 환불됩니다.',
+                          style: TextStyle(fontWeight: FontWeight.bold,
+                              color: Colors.grey[500])),
+                      SizedBox(height: 5,),
+                      Divider(),
+                      SizedBox(height: 5,),
+                      ...cancelReasons.map((reason) {
+                        return RadioListTile<String>(
+                          title: Text(reason),
+                          value: reason,
+                          groupValue: selectedReason,
+                          onChanged: (value) {
+                            setState(() {
+                              selectedReason = value!;
+                            });
+                          },
+                          activeColor: Colors.redAccent,
+                        );
+                      }).toList(),
+
+                      if (selectedReason == '기타')
+                        TextField(
+                          controller: reasonController,
+                          decoration: InputDecoration(
+                            hintText: '취소 사유를 입력해주세요.',
+                            border: UnderlineInputBorder(),
+                          ),
+                          maxLines: 2,
+                        ),
+
+                      SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final reason = selectedReason == '기타'
+                                ? reasonController.text.trim()
+                                : selectedReason;
+
+                            if (reason.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('취소 사유를 입력해주세요.')),
+                              );
+                              return;
+                            }
+
+                            // Firestore에 주문 상태 변경
+                            final user = FirebaseAuth.instance.currentUser;
+                            if (user != null) {
+                              final orderRef = FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(user.uid)
+                                  .collection('orders')
+                                  .doc(documentId);
+
+                              await orderRef.update({
+                                'status': '취소됨',
+                                'cancelReason': reason,
+                                'cancelAt': Timestamp.now(),
+                              });
+
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('주문이 취소되었습니다.')),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: Text('주문 취소하기'),
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                    ],
+                  ),
+                ),
               );
             },
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: Color(0xFF272727),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Color(0xFF272727), width: 1.5),
-              ),
-              child: Text(
-                "쇼핑하러 가기",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+          ),
+    );
+  }
+
+  // 리뷰 작성 다이얼로그
+  BuildContext? _dialogContext; // 전역처럼 써도 됨
+
+  void showReviewDialog(BuildContext context, Map<String, dynamic> order) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "리뷰 작성",
+      transitionDuration: Duration(milliseconds: 300),
+      pageBuilder: (ctx, animation, secondaryAnimation) {
+        _dialogContext = ctx;
+        return Center(
+          child: ReviewDialog(order),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final offsetAnimation = Tween<Offset>(
+          begin: Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+
+        return SlideTransition(
+          position: offsetAnimation,
+          child: child,
+        );
+      },
+    );
+  }
+
+  Widget ReviewDialog(Map<String, dynamic> order) {
+    final TextEditingController reviewController = TextEditingController();
+    int selectedScore = 0;
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: 20),
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 닫기 버튼
+                  Row(
+                    children: [
+                      Spacer(),
+                      IconButton(
+                        icon: Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+
+                  // 상품 정보
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Image.network(order['productImage'], width: 60, height: 60, fit: BoxFit.cover),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(order['productName'], style: TextStyle(fontWeight: FontWeight.bold)),
+                            SizedBox(height: 4),
+                            Text("상세 정보", style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      Text("${order['productPrice']} 원", style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+
+                  SizedBox(height: 20),
+
+                  // 별점 선택 (간격 줄인 버전)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      final starIndex = index + 1;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedScore = starIndex;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4), // 간격 줄임
+                          child: Icon(
+                            selectedScore >= starIndex ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 32,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+
+                  SizedBox(height: 20),
+
+                  // 리뷰 입력 (배경색 추가 + 높이 넉넉하게)
+                  Container(
+                    height: 150,
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Color(0xFFF5F5F5), // 연한 회색 배경
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: TextField(
+                      controller: reviewController,
+                      maxLines: null,
+                      decoration: InputDecoration.collapsed(
+                        hintText: "리뷰를 작성해주세요.\n비속어나 규정 위반 내용은 삭제될 수 있습니다.",
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 24),
+
+                  // 저장 버튼
+                  ElevatedButton(
+                    onPressed: () async {
+                      final user = FirebaseAuth.instance.currentUser;
+                      if (user == null) return;
+
+                      try {
+                        final reviewData = {
+                          'userId': user.uid,
+                          'score': selectedScore,
+                          'contents': reviewController.text,
+                          'createAt': Timestamp.now(),
+                        };
+
+                        await FirebaseFirestore.instance
+                            .collection('products')
+                            .doc(order['productId'])
+                            .collection('reviews')
+                            .doc(user.uid)
+                            .set(reviewData);
+
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('리뷰가 저장되었습니다.')),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('리뷰 저장 실패: $e')),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF92BBE2),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      padding: EdgeInsets.symmetric(horizontal: 50, vertical: 14),
+                    ),
+                    child: Text("저장하기"),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
+
 
   // 배송 대기 목록 & 배송 완료 목록 버튼 활성화/비활성화 부분
   Widget _buildDeliveryTabButton(String title, int index) {
@@ -1228,7 +1724,57 @@ class _MyPageMainState extends State<MyPageMain> {
 
   /////// - 환경 설정- ///////
 
-  // 환경 설정 콘텐츠가 보일 영역
+  // 고객센터 다이얼로그
+  void showComingSoonDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: SizedBox(
+            width: 350,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(24, 20, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 제목 + 닫기 버튼
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "고객센터",
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 16),
+
+                  // 내용 텍스트
+                  Text(
+                    "고객센터 기능은 추후 개발 예정입니다.",
+                    style: TextStyle(fontSize: 16, color: Colors.black87),
+                  ),
+
+                  SizedBox(height: 35),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+
   Widget _settings() {
     return StatefulBuilder(
       builder: (context, setState) {
@@ -1236,33 +1782,31 @@ class _MyPageMainState extends State<MyPageMain> {
           padding: EdgeInsets.all(16),
           children: [
             SizedBox(height: 12),
-            Text("알림 설정", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            Text("알림 설정",
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             SizedBox(height: 12),
             Divider(),
 
-            // 전체 알림
+            // 기존 알림 설정 토글들
             _buildToggleTile("전체 알림 받기", notiEnabled ?? true, (val) async {
               notiEnabled = val;
               await _updateNotiEnable(val);
               setState(() {});
             }),
-
-            // 댓글 알림
             _buildToggleTile("내 게시물 댓글 알림", commentNotification, (val) async {
               commentNotification = val;
               await _updateNotiSettings();
               setState(() {});
             }, enabled: notiEnabled ?? true),
-
-            // 좋아요 알림
             _buildToggleTile("내 게시물 좋아요 알림", likeNotification, (val) async {
               likeNotification = val;
               await _updateNotiSettings();
               setState(() {});
             }, enabled: notiEnabled ?? true),
 
-            SizedBox(height: 50),
-            Text("계정 설정", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            SizedBox(height: 30),
+            Text("계정 설정",
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             SizedBox(height: 12),
             Divider(),
             _buildSettingItem("배송지 관리", () {
@@ -1273,9 +1817,8 @@ class _MyPageMainState extends State<MyPageMain> {
             }),
             _buildSettingItem("개인정보 처리방침", () {
               Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => PrivacyPolicyPage(),)
-              );
+                  context,
+                  MaterialPageRoute(builder: (context) => PrivacyPolicyPage()));
             }),
             _buildSettingItem("로그아웃", () {
               _showLogoutDialog();
@@ -1283,6 +1826,17 @@ class _MyPageMainState extends State<MyPageMain> {
             _buildSettingItem("회원 탈퇴", () {
               _showDeleteAccountDialog();
             }, isDestructive: true),
+
+            SizedBox(height: 30),
+
+            // 고객센터 섹션 추가
+            Text("고객센터",
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            SizedBox(height: 12),
+            Divider(),
+            _buildSettingItem("문의하기", () { showComingSoonDialog(context); }),
+
+
             SizedBox(height: 50),
           ],
         );
@@ -1290,20 +1844,21 @@ class _MyPageMainState extends State<MyPageMain> {
     );
   }
 
+
   // 토글버튼
-  Widget _buildToggleTile(
-    String title,
-    bool value,
-    Function(bool) onChanged, {
-    bool enabled = true,
-  }) {
+  Widget _buildToggleTile(String title,
+      bool value,
+      Function(bool) onChanged, {
+        bool enabled = true,
+      }) {
     return Opacity(
       opacity: enabled ? 1.0 : 0.4,
       child: IgnorePointer(
         ignoring: !enabled,
         child: ListTile(
           contentPadding: EdgeInsets.only(left: 24, right: 0),
-          title: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          title: Text(title,
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
           trailing: CupertinoSwitch(
             value: value,
             onChanged: onChanged,
@@ -1315,11 +1870,10 @@ class _MyPageMainState extends State<MyPageMain> {
     );
   }
 
-  Widget _buildSettingItem(
-    String title,
-    VoidCallback onTap, {
-    bool isDestructive = false,
-  }) {
+  Widget _buildSettingItem(String title,
+      VoidCallback onTap, {
+        bool isDestructive = false,
+      }) {
     return Column(
       children: [
         ListTile(
@@ -1345,18 +1899,44 @@ class _MyPageMainState extends State<MyPageMain> {
       return Center(child: CircularProgressIndicator());
     }
     return Scaffold(
-
       backgroundColor: Colors.white,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('마이페이지', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
+        title: const Text('마이페이지',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
         backgroundColor: Colors.white,
         elevation: 0,
         shadowColor: Colors.transparent,
+        actions: [
+          if (userData != null && userData!['status'] == 'A')
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Color(0xFF272727),
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: Colors.transparent),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AdminProductPage(),
+                    ),
+                  );
+                },
+                icon: Icon(Icons.admin_panel_settings, size: 18),
+                label: Text("관리자"),
+              ),
+            ),
+        ],
       ),
       body: Stack(
         children: [
-          // 기존 콘텐츠
           Column(
             children: [
               Padding(
@@ -1369,14 +1949,14 @@ class _MyPageMainState extends State<MyPageMain> {
                     CircleAvatar(
                       radius: 30,
                       backgroundImage:
-                          userData!['imgPath'] != null &&
-                                  userData!['imgPath'] != ''
-                              ? NetworkImage(userData!['imgPath'])
-                              : null,
+                      userData!['imgPath'] != null &&
+                          userData!['imgPath'] != ''
+                          ? NetworkImage(userData!['imgPath'])
+                          : null,
                       child:
-                          userData!['imgPath'] == ''
-                              ? const Icon(Icons.person, size: 40)
-                              : null,
+                      userData!['imgPath'] == ''
+                          ? const Icon(Icons.person, size: 40)
+                          : null,
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -1385,7 +1965,8 @@ class _MyPageMainState extends State<MyPageMain> {
                         children: [
                           Text(
                             userData!['nickName'] ?? '',
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontSize: 20,
+                                fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
                           Text(userData!['userEmail'] ?? ''),
@@ -1399,32 +1980,46 @@ class _MyPageMainState extends State<MyPageMain> {
                         pickedImage = null;
 
                         await fetchUserData();
-                        showDialog(
-                          barrierDismissible: false,
+
+                        showGeneralDialog(
                           context: context,
-                          builder: (context) {
-                            return StatefulBuilder(
-                              builder: (context, setDialogState) {
-                                return Dialog(
-                                  backgroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: 10,
-                                  insetPadding: const EdgeInsets.symmetric(
-                                    horizontal: 40,
-                                  ),
-                                  child: this.buildProfileEditContent(
-                                    context,
-                                    setDialogState,
-                                  ),
-                                );
-                              },
+                          barrierDismissible: false,
+                          barrierLabel: "프로필 편집",
+                          transitionDuration: Duration(milliseconds: 300),
+                          pageBuilder: (context, animation, secondaryAnimation) {
+                            return Center(
+                              child: Material(
+                                color: Colors.transparent,
+                                child: StatefulBuilder(
+                                  builder: (context, setDialogState) {
+                                    return Dialog(
+                                      backgroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 10,
+                                      insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+                                      child: buildProfileEditContent(context, setDialogState),
+                                    );
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                          transitionBuilder: (context, animation, secondaryAnimation, child) {
+                            final curvedValue = Curves.easeOut.transform(animation.value);
+                            return Transform.translate(
+                              offset: Offset(0, 50 * (1 - curvedValue)),
+                              child: Opacity(
+                                opacity: curvedValue,
+                                child: child,
+                              ),
                             );
                           },
                         );
                       },
                     ),
+
                   ],
                 ),
               ),
@@ -1447,17 +2042,17 @@ class _MyPageMainState extends State<MyPageMain> {
                   },
                 ),
               ),
-              const SizedBox(height: 80), // 네비게이션 바 높이 고려 여유 공간
+              const SizedBox(height: 80),
             ],
           ),
 
-          // 하단 네비게이션 삽입
+          // 하단 네비게이션
           Positioned(
             left: 0,
             right: 0,
-            bottom: 30,
+            bottom: 10,
             child: BottomNavBar(
-              currentIndex: 4, // 마이페이지니까 4번
+              currentIndex: 4,
               onTap: (index) {
                 if (index == 0) {
                   Navigator.push(
@@ -1480,8 +2075,9 @@ class _MyPageMainState extends State<MyPageMain> {
                   );
                 } else if (index == 3) {
                   Navigator.push(
-                    context, 
-                    MaterialPageRoute(builder: (context) => NotificationScreen(),)
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => NotificationScreen(),)
                   );
                 }
               },
