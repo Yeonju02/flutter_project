@@ -10,12 +10,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:routinelogapp/notification/notification_screen.dart';
 
 import '../login/login_page.dart';
 import '../board/board_main_screen.dart';
 import '../main/main_page.dart';
 import '../shop/shop_main.dart';
+import '../admin/admin_product_page.dart';
+import '../notification/notification_screen.dart';
 import 'delivery_address.dart';
 import 'privacy_policy_page.dart';
 
@@ -1301,45 +1302,65 @@ class _MyPageMainState extends State<MyPageMain> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          /// 상단 상태 및 교환/환불
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Image.network(order['productImage'], width: 60,
-                  height: 60,
-                  fit: BoxFit.cover),
+              Text("배송 완료", style: TextStyle(fontSize: 12)),
+              TextButton(
+                onPressed: () {
+                  // 교환/환불 로직
+                },
+                child: Text("교환/환불 신청", style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Image.network(
+                order['productImage'],
+                width: 60,
+                height: 60,
+                fit: BoxFit.cover,
+              ),
               SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("배송 완료", style: TextStyle(fontSize: 12)),
-                        Spacer(),
-                        TextButton(
-                          onPressed: () {
-                            // 교환/환불 로직
-                          },
-                          child: Text("교환/환불 신청", style: TextStyle(color: Colors
-                              .red)),
+                        Expanded(
+                          child: Text(
+                            order['productName'],
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          "${order['productPrice']} 원",
+                          style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
-                    Text(order['productName'],
-                        style: TextStyle(fontWeight: FontWeight.bold)),
                     SizedBox(height: 4),
                     Text("상세 정보", style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
-              Text("${order['productPrice']} 원",
-                  style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           SizedBox(height: 12),
+
           Center(
             child: ElevatedButton(
               onPressed: () {
-                // 리뷰 작성 로직
+                showReviewDialog(context, order);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black87,
@@ -1356,7 +1377,6 @@ class _MyPageMainState extends State<MyPageMain> {
       ),
     );
   }
-
 
   // 주문 취소 다이얼로그
   void showCancelOrderDialog(BuildContext context, String documentId) {
@@ -1493,6 +1513,182 @@ class _MyPageMainState extends State<MyPageMain> {
               );
             },
           ),
+    );
+  }
+
+  // 리뷰 작성 다이얼로그
+  BuildContext? _dialogContext; // 전역처럼 써도 됨
+
+  void showReviewDialog(BuildContext context, Map<String, dynamic> order) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "리뷰 작성",
+      transitionDuration: Duration(milliseconds: 300),
+      pageBuilder: (ctx, animation, secondaryAnimation) {
+        _dialogContext = ctx;
+        return Center(
+          child: ReviewDialog(order),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final offsetAnimation = Tween<Offset>(
+          begin: Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+
+        return SlideTransition(
+          position: offsetAnimation,
+          child: child,
+        );
+      },
+    );
+  }
+
+  Widget ReviewDialog(Map<String, dynamic> order) {
+    final TextEditingController reviewController = TextEditingController();
+    int selectedScore = 0;
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: 20),
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 닫기 버튼
+                  Row(
+                    children: [
+                      Spacer(),
+                      IconButton(
+                        icon: Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+
+                  // 상품 정보
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Image.network(order['productImage'], width: 60, height: 60, fit: BoxFit.cover),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(order['productName'], style: TextStyle(fontWeight: FontWeight.bold)),
+                            SizedBox(height: 4),
+                            Text("상세 정보", style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      Text("${order['productPrice']} 원", style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+
+                  SizedBox(height: 20),
+
+                  // 별점 선택 (간격 줄인 버전)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      final starIndex = index + 1;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedScore = starIndex;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4), // 간격 줄임
+                          child: Icon(
+                            selectedScore >= starIndex ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 32,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+
+                  SizedBox(height: 20),
+
+                  // 리뷰 입력 (배경색 추가 + 높이 넉넉하게)
+                  Container(
+                    height: 150,
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Color(0xFFF5F5F5), // 연한 회색 배경
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: TextField(
+                      controller: reviewController,
+                      maxLines: null,
+                      decoration: InputDecoration.collapsed(
+                        hintText: "리뷰를 작성해주세요.\n비속어나 규정 위반 내용은 삭제될 수 있습니다.",
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 24),
+
+                  // 저장 버튼
+                  ElevatedButton(
+                    onPressed: () async {
+                      final user = FirebaseAuth.instance.currentUser;
+                      if (user == null) return;
+
+                      try {
+                        final reviewData = {
+                          'userId': user.uid,
+                          'score': selectedScore,
+                          'contents': reviewController.text,
+                          'createAt': Timestamp.now(),
+                        };
+
+                        await FirebaseFirestore.instance
+                            .collection('products')
+                            .doc(order['productId'])
+                            .collection('reviews')
+                            .doc(user.uid)
+                            .set(reviewData);
+
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('리뷰가 저장되었습니다.')),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('리뷰 저장 실패: $e')),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF92BBE2),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      padding: EdgeInsets.symmetric(horizontal: 50, vertical: 14),
+                    ),
+                    child: Text("저장하기"),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1703,7 +1899,6 @@ class _MyPageMainState extends State<MyPageMain> {
       return Center(child: CircularProgressIndicator());
     }
     return Scaffold(
-
       backgroundColor: Colors.white,
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -1712,10 +1907,36 @@ class _MyPageMainState extends State<MyPageMain> {
         backgroundColor: Colors.white,
         elevation: 0,
         shadowColor: Colors.transparent,
+        actions: [
+          if (userData != null && userData!['status'] == 'A')
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Color(0xFF272727),
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: Colors.transparent),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AdminProductPage(),
+                    ),
+                  );
+                },
+                icon: Icon(Icons.admin_panel_settings, size: 18),
+                label: Text("관리자"),
+              ),
+            ),
+        ],
       ),
       body: Stack(
         children: [
-          // 기존 콘텐츠
           Column(
             children: [
               Padding(
@@ -1759,32 +1980,46 @@ class _MyPageMainState extends State<MyPageMain> {
                         pickedImage = null;
 
                         await fetchUserData();
-                        showDialog(
-                          barrierDismissible: false,
+
+                        showGeneralDialog(
                           context: context,
-                          builder: (context) {
-                            return StatefulBuilder(
-                              builder: (context, setDialogState) {
-                                return Dialog(
-                                  backgroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: 10,
-                                  insetPadding: const EdgeInsets.symmetric(
-                                    horizontal: 40,
-                                  ),
-                                  child: this.buildProfileEditContent(
-                                    context,
-                                    setDialogState,
-                                  ),
-                                );
-                              },
+                          barrierDismissible: false,
+                          barrierLabel: "프로필 편집",
+                          transitionDuration: Duration(milliseconds: 300),
+                          pageBuilder: (context, animation, secondaryAnimation) {
+                            return Center(
+                              child: Material(
+                                color: Colors.transparent,
+                                child: StatefulBuilder(
+                                  builder: (context, setDialogState) {
+                                    return Dialog(
+                                      backgroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 10,
+                                      insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+                                      child: buildProfileEditContent(context, setDialogState),
+                                    );
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                          transitionBuilder: (context, animation, secondaryAnimation, child) {
+                            final curvedValue = Curves.easeOut.transform(animation.value);
+                            return Transform.translate(
+                              offset: Offset(0, 50 * (1 - curvedValue)),
+                              child: Opacity(
+                                opacity: curvedValue,
+                                child: child,
+                              ),
                             );
                           },
                         );
                       },
                     ),
+
                   ],
                 ),
               ),
@@ -1807,17 +2042,17 @@ class _MyPageMainState extends State<MyPageMain> {
                   },
                 ),
               ),
-              const SizedBox(height: 80), // 네비게이션 바 높이 고려 여유 공간
+              const SizedBox(height: 80),
             ],
           ),
 
-          // 하단 네비게이션 삽입
+          // 하단 네비게이션
           Positioned(
             left: 0,
             right: 0,
-            bottom: 15,
+            bottom: 10,
             child: BottomNavBar(
-              currentIndex: 4, // 마이페이지니까 4번
+              currentIndex: 4,
               onTap: (index) {
                 if (index == 0) {
                   Navigator.push(
