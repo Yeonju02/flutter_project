@@ -44,8 +44,8 @@ class _NightRoutineDetailPageState extends State<NightRoutineDetailPage>
       curve: Curves.easeOut,
     ));
 
-    _fadeController = AnimationController( // 달 뒷배경
-      duration: const Duration(milliseconds: 300),
+    _fadeController = AnimationController( // 달 뒷배경 애니메이션
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
 
@@ -166,7 +166,7 @@ class _NightRoutineDetailPageState extends State<NightRoutineDetailPage>
                           opacity: _fadeAnimation,
                           child: Image.asset(
                             'assets/moon_background2.png',
-                            width: 330,
+                            width: 300,
                             fit: BoxFit.cover,
                           ),
                         ),

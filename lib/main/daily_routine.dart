@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import '../custom/routine_box.dart';
 import 'routine_edit.dart';
+import '../custom/dialogs/xp_dialog.dart';
 
 class DailyRoutine extends StatefulWidget {
   final DateTime selectedDate;
@@ -28,11 +29,35 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
   List<Animation<double>> _lineAnimations = [];
 
   String? userDocId;
+  int userLevel = 1;
+  int userXP = 0;
 
   @override
   void initState() {
     super.initState();
     fetchRoutines();
+    fetchUserStatus();
+  }
+
+  Future<void> fetchUserStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
+    if (userId == null) return;
+
+    final userQuery = await FirebaseFirestore.instance
+        .collection('users')
+        .where('userId', isEqualTo: userId)
+        .limit(1)
+        .get();
+
+    if (userQuery.docs.isEmpty) return;
+
+    final userData = userQuery.docs.first.data();
+    userDocId = userQuery.docs.first.id;
+    setState(() {
+      userLevel = userData['level'] ?? 1;
+      userXP = userData['xp'] ?? 0;
+    });
   }
 
   @override
@@ -129,23 +154,13 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
   }
 
   void toggleCheck(int index) async {
+
     final item = routineList[index];
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final selectedDay = DateTime(widget.selectedDate.year, widget.selectedDate.month, widget.selectedDate.day);
 
-    print('오늘 날짜: $today');
-    print('선택된 날짜: $selectedDay');
-
-    if (selectedDay.isAfter(today)) {
-      print('미래 루틴 - 체크 불가');
-      Fluttertoast.showToast(
-        msg: "미래 루틴은 체크할 수 없습니다.",
-        gravity: ToastGravity.BOTTOM,
-        toastLength: Toast.LENGTH_SHORT,
-      );
-      return;
-    }
+    if (selectedDay.isAfter(today)) return;
 
     final nowTime = TimeOfDay.now();
     final startTime = _parseTime(item['startTime']);
@@ -155,25 +170,8 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
     final startMinutes = _toMinutes(startTime);
     final endMinutes = _toMinutes(endTime);
 
-    print("now $nowMinutes, start $startMinutes, end $endMinutes");
-
-    if (selectedDay.isAtSameMomentAs(today) && nowMinutes < startMinutes) {
-      Fluttertoast.showToast(
-        msg: "아직 루틴 수행 시간이 아닙니다.",
-        gravity: ToastGravity.BOTTOM,
-        toastLength: Toast.LENGTH_SHORT,
-      );
-      return;
-    }
-
-    if (index > 0 && !isCheckedList[index - 1]) {
-      Fluttertoast.showToast(
-        msg: "이전 루틴을 먼저 완료해주세요.",
-        gravity: ToastGravity.BOTTOM,
-        toastLength: Toast.LENGTH_SHORT,
-      );
-      return;
-    }
+    if (selectedDay.isAtSameMomentAs(today) && nowMinutes < startMinutes) return;
+    if (index > 0 && !isCheckedList[index - 1]) return;
 
     final docId = item['docId'];
     final deadline = _addMinutes(endTime, 10);
@@ -181,10 +179,22 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
     final isLate = nowMinutes > deadlineMinutes;
 
     final willBeChecked = !isCheckedList[index];
+    int baseXP = willBeChecked ? (isLate ? 0 : 10) : 0;
+
+    int streakCount = 0;
+    if (willBeChecked && baseXP > 0) {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(userDocId).get();
+      streakCount = userDoc.data()?['streakCount'] ?? 0;
+
+      final bonusRate = (streakCount >= 5 ? 5 : streakCount) * 0.1;
+      baseXP = (baseXP + baseXP * bonusRate).round();
+    }
+
+    final earnedXP = baseXP;
 
     setState(() {
       isCheckedList[index] = willBeChecked;
-      routineList[index]['xpEarned'] = willBeChecked ? (isLate ? 0 : 10) : 0;
+      routineList[index]['xpEarned'] = earnedXP;
 
       if (index < _controllers.length - 1) {
         if (willBeChecked) {
@@ -202,11 +212,25 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
         .doc(docId)
         .update({
       'isFinished': willBeChecked,
-      'xpEarned': willBeChecked ? (isLate ? 0 : 10) : 0,
+      'xpEarned': earnedXP,
     });
 
-    print('Firestore 업데이트 완료');
+    if (willBeChecked && earnedXP > 0) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => XpDialog(
+            currentLevel: userLevel,
+            currentXP: userXP,
+            earnedXP: earnedXP,
+              userDocId: userDocId!
+          ),
+        );
+      });
+    }
   }
+
 
 
   @override
@@ -309,7 +333,6 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
                   );
                   if (result == true) {
                     await fetchRoutines();
-
                     final parentState = context.findAncestorStateOfType<RoutineDetailPageState>();
                     parentState?.sliderKey.currentState?.refresh();
                   }

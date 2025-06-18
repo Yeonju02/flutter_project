@@ -6,12 +6,23 @@ class CycleExplainDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: const Color(0xFF182333),
+      backgroundColor: Colors.transparent, // 배경 투명
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       insetPadding: const EdgeInsets.all(24),
       child: Container(
         padding: const EdgeInsets.all(20),
         constraints: const BoxConstraints(maxHeight: 600),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF3E6897),//위쪽
+              Color(0xFF303359), //아래쪽
+            ],
+          ),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -32,19 +43,23 @@ class CycleExplainDialog extends StatelessWidget {
             const SizedBox(height: 12),
 
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
               decoration: BoxDecoration(
-                color: Colors.lightBlueAccent,
-                borderRadius: BorderRadius.circular(20),
+                color: const Color(0xFF1E4372),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 1.5),
               ),
               child: const Text(
                 '수면 주기의 비밀',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
 
             const SizedBox(height: 20),
-
 
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -55,7 +70,6 @@ class CycleExplainDialog extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // 본문 설명
             const Text(
               '우리의 수면은 단순히 “얼마나 오래 잤는가”보다\n“어느 타이밍에 깨는가”가 더 중요해요.',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
@@ -71,7 +85,7 @@ class CycleExplainDialog extends StatelessWidget {
                   '피로가 풀리지 않는 느낌이 듭니다.\n\n'
                   '반면, 렘수면 직후나 얕은 수면 단계에서 깨어나면\n'
                   '개운하고 맑은 정신으로 아침을 시작할 수 있어요.',
-              style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5),
+              style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.5,fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
           ],

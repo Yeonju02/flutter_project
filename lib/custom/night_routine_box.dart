@@ -129,7 +129,7 @@ class NightRoutineBox extends StatelessWidget {
                   child: isChecked
                       ? (xpEarned > 0
                       ? Icon(Icons.check, key: const ValueKey('check'), size: 18, color: blueColor)
-                      : Icon(Icons.close, key: const ValueKey('close'), size: 18, color: Colors.red))
+                      : Icon(Icons.close, key: const ValueKey('close'), size: 18, color: Color(0xFF737373)))
                       : const Icon(Icons.circle_outlined, key: ValueKey('none'), size: 18, color: Colors.grey),
                 ),
               ),
