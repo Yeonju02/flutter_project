@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../board/board_main_screen.dart';
 import '../custom/routine_calendar.dart';
 import '../custom/xp_level_bar.dart';
@@ -7,7 +8,9 @@ import '../notification/notification_screen.dart';
 import '../shop/shop_main.dart';
 import '../mypage/myPage_main.dart';
 import 'routine_detail.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -16,13 +19,31 @@ class MainPage extends StatefulWidget {
   State<MainPage> createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage> {
+class _MainPageState extends State<MainPage> with RouteAware {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  Key _calendarRefreshKey = UniqueKey(); // 달력 갱신용
+  Key _calendarRefreshKey = UniqueKey();
+  Key _xpBarKey = UniqueKey(); // 경험치바 새로고침용
 
-  //final prefs = await SharedPreferences.getInstance();  위쪽 import랑 이거 두 줄 쓰면 SharedPreference로 저장된 로그인 id 불러올 수 있음
-  //final userId = prefs.getString('userId');
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    setState(() {
+      _calendarRefreshKey = UniqueKey();
+      _xpBarKey = UniqueKey();
+    });
+  }
 
   void _goToPrevMonth() {
     setState(() {
@@ -36,141 +57,113 @@ class _MainPageState extends State<MainPage> {
     });
   }
 
-  void _refreshCalendar() {  // 키를 바꿔서 달력 위젯을 갱신하도록 함
-    setState(() {
-      _calendarRefreshKey = UniqueKey();
-    });
-  }
-
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 90),
-              child: Column(
-                children: [
-                  SizedBox(height: 20),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: XPLevelBar(),
-                  ),
-                  SizedBox(height: 15),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.chevron_left),
-                          onPressed: _goToPrevMonth,
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${_focusedDay.year}',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              '${_focusedDay.month.toString().padLeft(2, '0')}',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ],
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.chevron_right),
-                          onPressed: _goToNextMonth,
-                        ),
-                      ],
+    return MaterialApp(
+      navigatorObservers: [routeObserver],
+      home: Scaffold(
+        body: Stack(
+          children: [
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 90),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: XPLevelBar(key: _xpBarKey),
                     ),
-                  ),
-                  SizedBox(height: 15),
-                  Divider(thickness: 1),
-                  Expanded(
-                    child: RoutineCalendar(
-                      key: _calendarRefreshKey,
-                      focusedDay: _focusedDay,
-                      selectedDay: _selectedDay,
-                      onDaySelected: (selectedDay, focusedDay) async {
-                        setState(() {
-                          _selectedDay = selectedDay;
-                          _focusedDay = focusedDay;
-                        });
-
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RoutineDetailPage(date: selectedDay),
+                    const SizedBox(height: 15),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.chevron_left),
+                            onPressed: _goToPrevMonth,
                           ),
-                        ).then((value) {
-                          if (value == true) {
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_focusedDay.year}',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                '${_focusedDay.month.toString().padLeft(2, '0')}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.chevron_right),
+                            onPressed: _goToNextMonth,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    const Divider(thickness: 1),
+                    Expanded(
+                      child: RoutineCalendar(
+                        key: _calendarRefreshKey,
+                        focusedDay: _focusedDay,
+                        selectedDay: _selectedDay,
+                        onDaySelected: (selectedDay, focusedDay) async {
+                          setState(() {
+                            _selectedDay = selectedDay;
+                            _focusedDay = focusedDay;
+                          });
+
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => RoutineDetailPage(date: selectedDay),
+                            ),
+                          );
+
+                          if (result == true) {
                             setState(() {
                               _calendarRefreshKey = UniqueKey();
+                              _xpBarKey = UniqueKey();
                             });
                           }
-                        });
-
-
-                        if (result == true) {
-                          setState(() {
-                            _calendarRefreshKey = UniqueKey();
-                          });
-                        }
-                      },
+                        },
+                      ),
                     ),
-                  ),
-
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 30,  // 이거 안하면 너무 아래에 딱 붙는듯
-            child: BottomNavBar(
-              currentIndex: 2,
-              onTap: (index) {
-                if (index == 0) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ShopMainPage()),
-                  );
-                }
-
-                if (index == 1) {
-                  Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => const BoardMainScreen()),
-                  );
-                }
-
-                if (index == 3) {
-                  Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => const NotificationScreen()),
-                  );
-                }
-
-                if (index == 4) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const MyPageMain()),
-                  );
-                }
-              },
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 30,
+              child: BottomNavBar(
+                currentIndex: 2,
+                onTap: (index) {
+                  if (index == 0) {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const ShopMainPage()));
+                  } else if (index == 1) {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const BoardMainScreen()));
+                  } else if (index == 3) {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationScreen()));
+                  } else if (index == 4) {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const MyPageMain()));
+                  }
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

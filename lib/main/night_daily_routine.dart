@@ -1,28 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:routinelogapp/main/routine_detail.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import '../custom/routine_box.dart';
-import 'routine_edit.dart';
-import '../custom/dialogs/xp_dialog.dart';
+import '../custom/night_routine_box.dart';
+import 'night_routine_edit.dart';
+import '../custom/dialogs/xp_night_dialog.dart';
 
-class DailyRoutine extends StatefulWidget {
+class NightDailyRoutine extends StatefulWidget {
   final DateTime selectedDate;
-  final String routineType;
 
-  const DailyRoutine({
+  const NightDailyRoutine({
     super.key,
     required this.selectedDate,
-    required this.routineType,
   });
 
   @override
-  State<DailyRoutine> createState() => _DailyRoutineState();
+  State<NightDailyRoutine> createState() => _NightDailyRoutineState();
 }
 
-class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMixin {
+class _NightDailyRoutineState extends State<NightDailyRoutine> with TickerProviderStateMixin {
   List<Map<String, dynamic>> routineList = [];
   List<bool> isCheckedList = [];
   List<AnimationController> _controllers = [];
@@ -60,10 +57,11 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
     });
   }
 
+
   @override
-  void didUpdateWidget(covariant DailyRoutine oldWidget) {
+  void didUpdateWidget(covariant NightDailyRoutine oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.selectedDate != oldWidget.selectedDate || widget.routineType != oldWidget.routineType) {
+    if (widget.selectedDate != oldWidget.selectedDate) {
       fetchRoutines();
     }
   }
@@ -72,7 +70,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
     if (timeStr == null || timeStr.trim().isEmpty) return TimeOfDay.now();
     try {
       final match = RegExp(r'(\d{1,2}):(\d{2})\s*([aApP][mM])').firstMatch(timeStr);
-      if (match == null) throw FormatException('시간 형식 아님: \$timeStr');
+      if (match == null) throw FormatException('시간 형식 아님: $timeStr');
       int hour = int.parse(match.group(1)!);
       int minute = int.parse(match.group(2)!);
       String ampm = match.group(3)!.toUpperCase();
@@ -112,7 +110,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
         .doc(userDocId)
         .collection('routineLogs')
         .where('date', isEqualTo: dateStr)
-        .where('routineType', isEqualTo: widget.routineType)
+        .where('routineType', isEqualTo: 'night')
         .get();
 
     List<Map<String, dynamic>> routines = routinesSnapshot.docs.map((doc) {
@@ -155,6 +153,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
 
   void toggleCheck(int index) async {
 
+
     final item = routineList[index];
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -190,11 +189,11 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
       baseXP = (baseXP + baseXP * bonusRate).round();
     }
 
-    final earnedXP = baseXP;
+    final totalXp = baseXP;
 
     setState(() {
       isCheckedList[index] = willBeChecked;
-      routineList[index]['xpEarned'] = earnedXP;
+      routineList[index]['xpEarned'] = totalXp;
 
       if (index < _controllers.length - 1) {
         if (willBeChecked) {
@@ -212,19 +211,20 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
         .doc(docId)
         .update({
       'isFinished': willBeChecked,
-      'xpEarned': earnedXP,
+      'xpEarned': totalXp,
     });
 
-    if (willBeChecked && earnedXP > 0) {
+    // XP 다이얼로그 표시
+    if (willBeChecked && totalXp > 0) {
       Future.delayed(const Duration(milliseconds: 300), () {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (_) => XpDialog(
+          builder: (_) => XpNightDialog(
             currentLevel: userLevel,
             currentXP: userXP,
-            earnedXP: earnedXP,
-              userDocId: userDocId!
+            earnedXP: totalXp,
+            userDocId: userDocId!,
           ),
         );
       });
@@ -244,11 +244,15 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     if (routineList.isEmpty) {
-      return const Center(child: Text('등록된 루틴이 없습니다.'));
+      return const Center(
+        child: Text(
+          '등록된 루틴이 없습니다.',
+          style: TextStyle(color: Colors.white),
+        ),
+      );
     }
 
     return ListView.builder(
-      shrinkWrap: true,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       itemCount: routineList.length,
       itemBuilder: (context, index) {
@@ -257,11 +261,11 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
         final xpEarned = item['xpEarned'] ?? 0;
 
         final dotColor = isChecked
-            ? (xpEarned > 0 ? Colors.blue : Colors.red)
+            ? (xpEarned > 0 ? Color(0xFFD5BA51) : Color(0xFF737373))
             : Colors.grey.shade400;
 
         final lineColor = isChecked
-            ? (xpEarned > 0 ? Colors.blue : Colors.red)
+            ? (xpEarned > 0 ? Color(0xFFD5BA51) : Color(0xFF737373))
             : Colors.grey.shade300;
 
         return Row(
@@ -307,7 +311,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: RoutineBox(
+              child: NightRoutineBox(
                 routineId: item['docId'],
                 startTime: item['startTime'] ?? '',
                 endTime: item['endTime'] ?? '',
@@ -322,10 +326,8 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
                   final result = await showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                    ),
-                    builder: (_) => RoutineEditDialog(
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => NightRoutineEditDialog(
                       routineData: item,
                       userDocId: userDocId!,
                       routineDocId: item['docId'],
@@ -333,8 +335,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
                   );
                   if (result == true) {
                     await fetchRoutines();
-                    final parentState = context.findAncestorStateOfType<RoutineDetailPageState>();
-                    parentState?.sliderKey.currentState?.refresh();
+                    setState(() {});
                   }
                 },
               ),
