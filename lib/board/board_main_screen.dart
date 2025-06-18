@@ -338,15 +338,15 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
     bool isExpanded = false;
 
     return GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => BoardDetailScreen(boardId: post['boardId']),
-            ),
-          );
-        },
-        child: StatefulBuilder(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BoardDetailScreen(boardId: post['boardId']),
+          ),
+        );
+      },
+      child: StatefulBuilder(
         builder: (context, setState) {
           return FutureBuilder<DocumentSnapshot>(
             future: FirebaseFirestore.instance.collection('users').doc(post['userId']).get(),
@@ -510,10 +510,10 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                     return Column(
                                       children: [
                                         IconButton(
-                                          icon: Icon(
-                                            isLiked ? Icons.favorite : Icons.favorite_border,
-                                            color: isLiked ? const Color(0xFFF45050) : Colors.grey,
-                                          ),
+                                            icon: Icon(
+                                              isLiked ? Icons.favorite : Icons.favorite_border,
+                                              color: isLiked ? const Color(0xFFF45050) : Colors.grey,
+                                            ),
                                             onPressed: () async {
                                               if (isLiked) {
                                                 // 좋아요 취소
