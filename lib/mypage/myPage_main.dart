@@ -15,8 +15,9 @@ import '../login/login_page.dart';
 import '../board/board_main_screen.dart';
 import '../main/main_page.dart';
 import '../shop/shop_main.dart';
-import '../admin/admin_product_page.dart';
+import '../admin/admin_user_page.dart';
 import '../notification/notification_screen.dart';
+import '../shop/product_detail.dart';
 import 'delivery_address.dart';
 import 'privacy_policy_page.dart';
 
@@ -101,7 +102,10 @@ class _MyPageMainState extends State<MyPageMain> {
     return (colorsList[0]['imgPath'] ?? '').toString().trim();
   }
 
-// 결제 완료 + 취소 목록 가져오기
+  List<Map<String, dynamic>> pendingOrders = [];
+  List<Map<String, dynamic>> completedOrders = [];
+
+  // 결제 완료 + 취소 목록 가져오기
   Future<List<Map<String, dynamic>>> fetchOrderList(bool isCompleted) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
@@ -157,15 +161,94 @@ class _MyPageMainState extends State<MyPageMain> {
         .doc(user.uid)
         .collection('orders');
 
+    // 배송완료 주문만 조회
     final query = ordersRef.where('status', isEqualTo: '배송완료');
-
     final snapshot = await query.get();
+
     List<Map<String, dynamic>> results = [];
 
     for (var doc in snapshot.docs) {
-      final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-      final productId = data['productId'];
-      final selectedColor = (data['selectedColor'] ?? '').toString();
+      final orderData = doc.data() as Map<String, dynamic>;
+      final productId = orderData['productId'] as String;
+      final selectedColor = (orderData['selectedColor'] ?? '').toString().trim();
+
+
+      // 리뷰 문서 확인
+      final reviewDoc = await FirebaseFirestore.instance
+          .collection('products')
+          .doc(productId)
+          .collection('reviews')
+          .doc(user.uid)
+          .get();
+
+      final reviewColor = (reviewDoc.data()?['selectedColor'] ?? '').toString();
+      final hasMatchingReview = reviewDoc.exists && reviewColor == selectedColor;
+
+      if (hasMatchingReview) continue;
+
+      print("검사 중: productId=$productId / selectedColor=$selectedColor");
+      if (reviewDoc.exists) {
+        print("리뷰 있음, selectedColor=${reviewDoc.data()?['selectedColor']}");
+      }
+
+
+      // 상품 데이터 불러오기
+      final productDoc = await FirebaseFirestore.instance
+          .collection('products')
+          .doc(productId)
+          .get();
+
+      final productData = productDoc.data();
+      if (productData == null) continue;
+
+      final colorsList = productData['colors'] as List<dynamic>? ?? [];
+      final imgPath = _getImageBySelectedColor(colorsList, selectedColor);
+
+      results.add({
+        ...orderData,
+        'documentId': doc.id,
+        'productName': productData['productName'] ?? '',
+        'productPrice': productData['productPrice'] ?? 0,
+        'productImage': imgPath.startsWith('http') ? imgPath : '',
+      });
+
+    }
+
+    return results;
+  }
+
+  String getImageUrlFromColors(List<dynamic>? colors, String selectedColor) {
+    if (colors == null) return '';
+    for (final color in colors) {
+      if (color is Map && color['color'] == selectedColor) {
+        final imgPath = color['imgPath'];
+        if (imgPath is String && imgPath.startsWith('http')) {
+          return imgPath;
+        }
+      }
+    }
+    return '';
+  }
+
+  // 리뷰 리스트 가져오기
+  Future<List<Map<String, dynamic>>> fetchMyReviewList(List<String> myProductIds) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return [];
+
+    List<Map<String, dynamic>> result = [];
+
+    for (String productId in myProductIds) {
+      final reviewDoc = await FirebaseFirestore.instance
+          .collection('products')
+          .doc(productId)
+          .collection('reviews')
+          .doc(user.uid)
+          .get();
+
+      if (!reviewDoc.exists) continue;
+
+      final reviewData = reviewDoc.data()!;
+      final selectedColor = (reviewData['selectedColor'] ?? '').toString();
 
       final productDoc = await FirebaseFirestore.instance
           .collection('products')
@@ -173,44 +256,218 @@ class _MyPageMainState extends State<MyPageMain> {
           .get();
 
       final productData = productDoc.data();
+      if (productData == null) continue;
 
-      if (productData != null) {
-        final colorsList = productData['colors'] as List<dynamic>?;
+      final colorsList = productData['colors'] as List<dynamic>? ?? [];
 
-        final imgPath = _getImageBySelectedColor(colorsList, selectedColor);
+      final hasMatchingColor = colorsList.any(
+            (color) => (color['color'] ?? '').toString() == selectedColor,
+      );
+      if (!hasMatchingColor) continue;
 
-        results.add({
-          ...data,
-          'documentId': doc.id,
-          'productName': productData['productName'] ?? '',
-          'productPrice': productData['productPrice'] ?? 0,
-          'productImage': imgPath.startsWith('http') ? imgPath : '',
-        });
-      }
+      final imgPath = getImageUrlFromColors(colorsList, selectedColor);
+
+      result.add({
+        ...reviewData,
+        'productId': productId,
+        'productName': productData['productName'] ?? '',
+        'productImage': imgPath.startsWith('http') ? imgPath : '',
+        'productPrice': productData['productPrice'] ?? 0,
+        'selectedColor': selectedColor,
+        'colors': colorsList,
+        'description' : productData['description'] ?? '',
+      });
     }
-    return results;
+
+    return result;
+  }
+
+  // 내가 작성한 리뷰 지우기
+  Future<void> deleteReview(String productId, String userId) async {
+    await FirebaseFirestore.instance
+        .collection('products')
+        .doc(productId)
+        .collection('reviews')
+        .doc(userId)
+        .delete();
+  }
+
+  // 내가 작성한 리뷰 수정하기
+  Future<void> showEditReviewDialog(BuildContext context, Map<String, dynamic> review, VoidCallback onUpdated) async {
+    final TextEditingController contentController = TextEditingController(text: review['contents'] ?? '');
+    int selectedScore = (review['score'] is int) ? review['score'] as int : 0;
+
+    await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return Dialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Material(
+                  color: Colors.white, // 다이얼로그 배경을 흰색으로 명시
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 350,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(24, 20, 24, 24),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 제목과 닫기 버튼
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '리뷰 수정',
+                                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.close),
+                                  onPressed: () => Navigator.of(context).pop(),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 16),
+
+                            // 별점 선택 UI
+                            Text('별점 (1~5)', style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 6),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: List.generate(5, (i) {
+                                  final starIndex = i + 1;
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setDialogState(() {
+                                        selectedScore = starIndex;
+                                      });
+                                    },
+                                    child: Icon(
+                                      starIndex <= selectedScore ? Icons.star : Icons.star_border,
+                                      color: Colors.amber,
+                                      size: 30,
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ),
+
+                            SizedBox(height: 16),
+
+                            // 리뷰 내용 입력
+                            Text('리뷰 내용', style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 6),
+                            TextField(
+                              controller: contentController,
+                              maxLines: 4,
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                enabledBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.grey.shade300),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(color: Color(0xFF92BBE2), width: 2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                hintText: '리뷰 내용을 입력하세요',
+                                contentPadding: EdgeInsets.all(12),
+                              ),
+                            ),
+                            SizedBox(height: 35),
+
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color(0xFF92BBE2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: EdgeInsets.symmetric(vertical: 14),
+                                ),
+                                onPressed: () async {
+                                  final newContent = contentController.text.trim();
+
+                                  if (newContent.isEmpty || selectedScore <= 0 || selectedScore > 5) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('내용과 별점을 올바르게 입력해주세요.')),
+                                    );
+                                    return;
+                                  }
+
+                                  // Firestore 업데이트
+                                  await FirebaseFirestore.instance
+                                      .collection('products')
+                                      .doc(review['productId'])
+                                      .collection('reviews')
+                                      .doc(review['userId'])
+                                      .update({
+                                    'contents': newContent,
+                                    'score': selectedScore,
+                                    'updatedAt': Timestamp.now(),
+                                  });
+
+                                  Navigator.of(context).pop();
+                                  onUpdated();
+                                },
+                                child: Text(
+                                  '저장하기',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        });
   }
 
 
   List<Map<String, dynamic>> orderList = [];
   bool isLoading = true;
 
-  void loadOrders() async {
-    try {
-      setState(() {
-        isLoading = true;
-      });
+  Future<void> loadOrders() async {
+    setState(() {
+      isLoading = true;
+    });
 
-      bool isCompleted = selectedDeliveryTab == 1; // 1이면 배송 완료 목록
-      orderList = await fetchOrderList(isCompleted);
-    } catch (e) {
-      print("배송 목록 로드 중 오류: $e");
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
-    }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    List<Map<String, dynamic>> allOrders = [];
+    List<Map<String, dynamic>> completedOrders = await fetchCompletedOrderList(); // 리뷰 걸러진 배송완료
+    List<Map<String, dynamic>> pendingOrders = await fetchOrderList(false); // 결제완료 + 취소됨
+
+    allOrders = [...pendingOrders, ...completedOrders]; // 한꺼번에 다 담는다
+
+    setState(() {
+      orderList = allOrders;
+      isLoading = false;
+    });
   }
+
 
   // 1. 프로필 편집 다이얼로그 상태 변수
   XFile? pickedImage; // 이미지 저장
@@ -267,7 +524,7 @@ class _MyPageMainState extends State<MyPageMain> {
     setState(() {});
   }
 
-
+  // 알림 상태 업데이트
   Future<void> _updateNotiEnable(bool enable) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -296,7 +553,7 @@ class _MyPageMainState extends State<MyPageMain> {
     setState(() {});
   }
 
-
+  // 좋아요, 댓글 알림 상태 업데이트
   Future<void> _updateNotiSettings() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -314,6 +571,8 @@ class _MyPageMainState extends State<MyPageMain> {
 
   List<Map<String, dynamic>> myPosts = [];
 
+  
+  // 내가 작성한 게시물 가져오기
   Future<void> fetchMyPosts() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -624,29 +883,6 @@ class _MyPageMainState extends State<MyPageMain> {
 
   /////// - 내 탭 매뉴 - ///////
 
-  Widget _buildTabButton(String title, int index) {
-    final isSelected = selectedTabIndex == index;
-    return TextButton(
-      onPressed: () {
-        setState(() {
-          selectedTabIndex = index;
-        });
-      },
-      style: ButtonStyle(
-        overlayColor: MaterialStateProperty.all(Colors.transparent),
-        splashFactory: NoSplash.splashFactory, // 물결 제거
-      ),
-      child: Text(
-        title,
-        style: TextStyle(
-          color: Colors.black,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          fontSize: 16,
-        ),
-      ),
-    );
-  }
-
   /////// - 프로필 편집 영역 -///////
 
   // 1) 닫기 버튼 눌렀을 때 나갈지 묻는 확인 다이얼로그 함수
@@ -927,9 +1163,9 @@ class _MyPageMainState extends State<MyPageMain> {
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
-                color: Color(0xFF272727),
+                color: Color(0xFF92BBE2),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Color(0xFF272727), width: 1.5),
+                border: Border.all(color: Color(0xFF92BBE2), width: 1.5),
               ),
               child: Text(
                 "커뮤니티 게시판 가기",
@@ -966,9 +1202,8 @@ class _MyPageMainState extends State<MyPageMain> {
         ),
         child: Row(
           children: [
-            // 📄 왼쪽: 텍스트 영역
             Expanded(
-              flex: 2, // 너비 비율 조정
+              flex: 2,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 12),
@@ -1008,7 +1243,6 @@ class _MyPageMainState extends State<MyPageMain> {
               ),
             ),
 
-            // 🖼 오른쪽: 이미지 영역 (카드를 덮도록)
             ClipRRect(
               borderRadius: BorderRadius.only(
                 topRight: Radius.circular(12),
@@ -1036,11 +1270,11 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
 
+
   /////// - 주문 내역 - ///////
 
   // 내 주문 내역이 보일 영역
   Widget _orderHistory() {
-
     orderList.sort((a, b) {
       if (a['status'] == b['status']) return 0;
       if (a['status'] == '취소됨') return 1; // 취소됨은 뒤로
@@ -1056,8 +1290,13 @@ class _MyPageMainState extends State<MyPageMain> {
         .where((order) => order['status'] == '배송완료')
         .toList();
 
-    final showList = selectedDeliveryTab == 0 ? pendingOrders : completedOrders;
+    final showList = selectedDeliveryTab == 0
+        ? pendingOrders
+        : selectedDeliveryTab == 1
+        ? completedOrders
+        : [];
 
+    final myProductIds = orderList.map((e) => e['productId'] as String).toSet().toList();
 
     return Column(
       children: [
@@ -1068,12 +1307,16 @@ class _MyPageMainState extends State<MyPageMain> {
             _buildDeliveryTabButton("배송 대기 목록", 0),
             SizedBox(width: 12),
             _buildDeliveryTabButton("배송 완료 목록", 1),
+            SizedBox(width: 12),
+            _buildDeliveryTabButton("내 리뷰", 2),
           ],
         ),
         SizedBox(height: 24),
         Expanded(
           child: isLoading
               ? Center(child: Text("로딩중..."))
+              : selectedDeliveryTab == 2
+              ? _buildMyReviews(myProductIds)
               : showList.isEmpty
               ? Center(
             child: Column(
@@ -1099,9 +1342,9 @@ class _MyPageMainState extends State<MyPageMain> {
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       decoration: BoxDecoration(
-                        color: Color(0xFF272727),
+                        color: Color(0xFF92BBE2),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Color(0xFF272727), width: 1.5),
+                        border: Border.all(color: Color(0xFF92BBE2), width: 1.5),
                       ),
                       child: Text(
                         "쇼핑하러 가기",
@@ -1125,7 +1368,6 @@ class _MyPageMainState extends State<MyPageMain> {
             },
           ),
         ),
-
       ],
     );
   }
@@ -1302,7 +1544,6 @@ class _MyPageMainState extends State<MyPageMain> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /// 상단 상태 및 교환/환불
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1349,7 +1590,6 @@ class _MyPageMainState extends State<MyPageMain> {
                       ],
                     ),
                     SizedBox(height: 4),
-                    Text("상세 정보", style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
@@ -1359,11 +1599,17 @@ class _MyPageMainState extends State<MyPageMain> {
 
           Center(
             child: ElevatedButton(
-              onPressed: () {
-                showReviewDialog(context, order);
+              onPressed: () async {
+                final result = await showReviewDialog(context, order);
+                if (result == true) {
+                  final updatedCompleted = await fetchCompletedOrderList();
+                  setState(() {
+                    completedOrders = updatedCompleted;
+                  });
+                }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black87,
+                backgroundColor: Color(0xFF272727),
                 foregroundColor: Colors.white,
                 padding: EdgeInsets.symmetric(horizontal: 32, vertical: 10),
                 shape: RoundedRectangleBorder(
@@ -1372,11 +1618,189 @@ class _MyPageMainState extends State<MyPageMain> {
               ),
               child: Text("리뷰 작성하기"),
             ),
-          ),
+          )
+
         ],
       ),
     );
   }
+
+  // 리뷰 리스트
+  Widget _buildMyReviews(List<String> myProductIds) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: fetchMyReviewList(myProductIds),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(child: Text("작성한 리뷰가 없습니다."));
+        }
+
+        final reviews = snapshot.data!;
+
+        return ListView.builder(
+          itemCount: reviews.length,
+          itemBuilder: (context, index) {
+            final review = reviews[index];
+            final imageUrl = review['productImage'] ?? '';
+            final selectedColor = review['selectedColor'] ?? '';
+            final reviewImages = (review['images'] ?? <String>[]) as List<dynamic>;
+
+            return Card(
+              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              color: Colors.white,
+              elevation: 2,
+              shadowColor: Colors.black.withOpacity(0.5),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) {
+                                      print('🧩 review: $review');
+                                      return ProductDetailPage(data: review);
+                                    }
+                                  ),
+                                );
+                              },
+                              child: imageUrl.isNotEmpty
+                                  ? Image.network(
+                                imageUrl,
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Icon(Icons.broken_image, size: 60),
+                              )
+                                  : Icon(Icons.image_not_supported, size: 60),
+                            ),
+                            SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(Icons.star, color: Colors.amber, size: 16),
+                                SizedBox(width: 4),
+                                Text(
+                                  "${review['score']}",
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+
+                        SizedBox(width: 12),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                review['productName'] ?? '',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                "${review['productPrice']}원",
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
+                              if (selectedColor.isNotEmpty)
+                                Text(
+                                  "색상: $selectedColor",
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                            ],
+                          ),
+                        ),
+
+                        PopupMenuButton<String>(
+                          icon: Icon(Icons.more_vert),
+                          onSelected: (value) async {
+                            if (value == 'edit') {
+                              await showEditReviewDialog(context, review, () {
+                                // 수정 후 리스트 다시 로드(예: setState 혹은 FutureBuilder 다시 실행)
+                                setState(() {});
+                              });
+                            } else if (value == 'delete') {
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text('리뷰 삭제'),
+                                  content: Text('정말 이 리뷰를 삭제하시겠습니까?'),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(context, false), child: Text('취소')),
+                                    TextButton(onPressed: () => Navigator.pop(context, true), child: Text('삭제')),
+                                  ],
+                                ),
+                              );
+                              if (confirmed == true) {
+                                await deleteReview(review['productId'], review['userId']);
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('리뷰가 삭제되었습니다.')));
+                                setState(() {}); // 리스트 갱신
+                              }
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem(value: 'edit', child: Text('리뷰 수정')),
+                            PopupMenuItem(value: 'delete', child: Text('리뷰 삭제')),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: 12),
+
+                    // 리뷰 사진들 (왼쪽 정렬 가로 스크롤)
+                    if (reviewImages.isNotEmpty)
+                      SizedBox(
+                        height: 100,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: reviewImages.length,
+                          itemBuilder: (context, i) {
+                            final imgUrl = reviewImages[i].toString();
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  imgUrl,
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Icon(Icons.broken_image, size: 100),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+
+
 
   // 주문 취소 다이얼로그
   void showCancelOrderDialog(BuildContext context, String documentId) {
@@ -1519,16 +1943,22 @@ class _MyPageMainState extends State<MyPageMain> {
   // 리뷰 작성 다이얼로그
   BuildContext? _dialogContext; // 전역처럼 써도 됨
 
-  void showReviewDialog(BuildContext context, Map<String, dynamic> order) {
-    showGeneralDialog(
+  Future<bool> showReviewDialog(BuildContext context, Map<String, dynamic> order) async {
+    bool isReviewSaved = false;
+
+    await showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: "리뷰 작성",
       transitionDuration: Duration(milliseconds: 300),
       pageBuilder: (ctx, animation, secondaryAnimation) {
-        _dialogContext = ctx;
         return Center(
-          child: ReviewDialog(order),
+          child: ReviewDialog(
+            order,
+            onReviewSaved: () {
+              Navigator.of(ctx).pop(true);
+            },
+          ),
         );
       },
       transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -1543,14 +1973,42 @@ class _MyPageMainState extends State<MyPageMain> {
         );
       },
     );
+
+    return isReviewSaved; // ✅ 결과 리턴
   }
 
-  Widget ReviewDialog(Map<String, dynamic> order) {
+
+
+  Widget ReviewDialog(Map<String, dynamic> order, {required VoidCallback onReviewSaved}) {
     final TextEditingController reviewController = TextEditingController();
     int selectedScore = 0;
+    List<XFile> selectedImages = [];
 
     return StatefulBuilder(
       builder: (context, setState) {
+        Future<void> pickImages() async {
+          final ImagePicker picker = ImagePicker();
+          final List<XFile>? images = await picker.pickMultiImage();
+          if (images != null) {
+            setState(() {
+              selectedImages.addAll(images);
+            });
+          }
+        }
+
+        Future<String?> uploadImage(XFile image) async {
+          try {
+            final storageRef = FirebaseStorage.instance
+                .ref()
+                .child('review_images/${DateTime.now().millisecondsSinceEpoch}_${image.name}');
+            final uploadTask = await storageRef.putFile(File(image.path));
+            return await uploadTask.ref.getDownloadURL();
+          } catch (e) {
+            print('이미지 업로드 실패: $e');
+            return null;
+          }
+        }
+
         return Material(
           color: Colors.transparent,
           child: Container(
@@ -1563,8 +2021,8 @@ class _MyPageMainState extends State<MyPageMain> {
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 닫기 버튼
                   Row(
                     children: [
                       Spacer(),
@@ -1574,8 +2032,6 @@ class _MyPageMainState extends State<MyPageMain> {
                       ),
                     ],
                   ),
-
-                  // 상품 정보
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1594,12 +2050,9 @@ class _MyPageMainState extends State<MyPageMain> {
                       Text("${order['productPrice']} 원", style: TextStyle(fontWeight: FontWeight.bold)),
                     ],
                   ),
-
                   SizedBox(height: 20),
-
-                  // 별점 선택 (간격 줄인 버전)
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.start,
                     children: List.generate(5, (index) {
                       final starIndex = index + 1;
                       return GestureDetector(
@@ -1608,60 +2061,113 @@ class _MyPageMainState extends State<MyPageMain> {
                             selectedScore = starIndex;
                           });
                         },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4), // 간격 줄임
-                          child: Icon(
-                            selectedScore >= starIndex ? Icons.star : Icons.star_border,
-                            color: Colors.amber,
-                            size: 32,
-                          ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              selectedScore >= starIndex ? Icons.star : Icons.star_border,
+                              color: Colors.amber,
+                              size: 32,
+                            ),
+                            if (index != 4) SizedBox(width: 6),
+                          ],
                         ),
                       );
                     }),
                   ),
-
                   SizedBox(height: 20),
-
-                  // 리뷰 입력 (배경색 추가 + 높이 넉넉하게)
                   Container(
-                    height: 150,
+                    height: 200,
                     padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Color(0xFFF5F5F5), // 연한 회색 배경
+                      color: Color(0xFFF5F5F5),
                       border: Border.all(color: Colors.grey.shade300),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: TextField(
                       controller: reviewController,
                       maxLines: null,
+                      style: TextStyle(color: Colors.grey[800]),
                       decoration: InputDecoration.collapsed(
                         hintText: "리뷰를 작성해주세요.\n비속어나 규정 위반 내용은 삭제될 수 있습니다.",
+                        hintStyle: TextStyle(color: Colors.grey[400]),
                       ),
                     ),
                   ),
-
+                  SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: pickImages,
+                    icon: Icon(Icons.add_a_photo, color: Color(0xFF92BBE2)),
+                    label: Text(
+                      "이미지 추가",
+                      style: TextStyle(color: Color(0xFF92BBE2)),
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  SizedBox(
+                    height: 80,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: selectedImages.length,
+                      itemBuilder: (context, i) {
+                        return Stack(
+                          children: [
+                            Container(
+                              margin: EdgeInsets.only(right: 8),
+                              child: Image.file(
+                                File(selectedImages[i].path),
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    selectedImages.removeAt(i);
+                                  });
+                                },
+                                child: CircleAvatar(
+                                  radius: 12,
+                                  backgroundColor: Colors.black54,
+                                  child: Icon(Icons.close, size: 16, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                   SizedBox(height: 24),
-
-                  // 저장 버튼
                   ElevatedButton(
                     onPressed: () async {
                       final user = FirebaseAuth.instance.currentUser;
                       if (user == null) return;
-
                       try {
+                        List<String> uploadedImageUrls = [];
+                        for (var img in selectedImages) {
+                          final url = await uploadImage(img);
+                          if (url != null) uploadedImageUrls.add(url);
+                        }
                         final reviewData = {
                           'userId': user.uid,
                           'score': selectedScore,
                           'contents': reviewController.text,
-                          'createAt': Timestamp.now(),
+                          'images': uploadedImageUrls,
+                          'createdAt': Timestamp.now(),
+                          'selectedColor': order['selectedColor'] ?? '',
                         };
-
                         await FirebaseFirestore.instance
                             .collection('products')
                             .doc(order['productId'])
                             .collection('reviews')
                             .doc(user.uid)
                             .set(reviewData);
+
+                        onReviewSaved();
 
                         Navigator.of(context).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1693,7 +2199,11 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
 
+
+
   // 배송 대기 목록 & 배송 완료 목록 버튼 활성화/비활성화 부분
+  
+  // UI 수정중
   Widget _buildDeliveryTabButton(String title, int index) {
     final bool isSelected = selectedDeliveryTab == index;
 
@@ -1704,23 +2214,34 @@ class _MyPageMainState extends State<MyPageMain> {
         });
         loadOrders();
       },
-      child: Container(
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? Color(0xFF272727) : Colors.white,
+          color: isSelected ? Color(0xFF272727) : Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Color(0xFF272727), width: 1.5),
+          boxShadow: isSelected
+              ? [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            )
+          ]
+              : [],
         ),
         child: Text(
           title,
           style: TextStyle(
-            color: isSelected ? Colors.white : Color(0xFF272727),
-            fontWeight: FontWeight.bold,
+            color: isSelected ? Color(0xFFA0AEC0) : Color(0xFF888888),
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
     );
   }
+
 
   /////// - 환경 설정- ///////
 
@@ -1925,7 +2446,7 @@ class _MyPageMainState extends State<MyPageMain> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => AdminProductPage(),
+                      builder: (context) => UserAdminPage(),
                     ),
                   );
                 },
@@ -2023,16 +2544,160 @@ class _MyPageMainState extends State<MyPageMain> {
                   ],
                 ),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildTabButton("내 게시물", 0),
-                  _buildTabButton("주문 내역", 1),
-                  _buildTabButton("환경 설정", 2),
-                ],
+              Container(
+                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Color(0xFF92BBE2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // 내 게시물
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedTabIndex = 0;
+                          });
+                        },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.article_outlined,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              "내 게시물",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: selectedTabIndex == 0 ? FontWeight.bold : FontWeight.normal,
+                                fontSize: selectedTabIndex == 0 ? 14 : 13,
+                              ),
+                            ),
+                            AnimatedOpacity(
+                              duration: Duration(milliseconds: 200),
+                              opacity: selectedTabIndex == 0 ? 1.0 : 0.0,
+                              child: Container(
+                                margin: EdgeInsets.only(top: 4),
+                                height: 3,
+                                width: 36,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: Colors.white.withOpacity(0.3),
+                    ),
+
+                    // 주문 내역
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedTabIndex = 1;
+                          });
+                        },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.shopping_bag_outlined,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              "주문 내역",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: selectedTabIndex == 1 ? FontWeight.bold : FontWeight.normal,
+                                fontSize: selectedTabIndex == 1 ? 14 : 13,
+                              ),
+                            ),
+                            AnimatedOpacity(
+                              duration: Duration(milliseconds: 200),
+                              opacity: selectedTabIndex == 1 ? 1.0 : 0.0,
+                              child: Container(
+                                margin: EdgeInsets.only(top: 4),
+                                height: 3,
+                                width: 36,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: Colors.white.withOpacity(0.3),
+                    ),
+
+                    // 환경 설정
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedTabIndex = 2;
+                          });
+                        },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.settings_outlined,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              "환경 설정",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: selectedTabIndex == 2 ? FontWeight.bold : FontWeight.normal,
+                                fontSize: selectedTabIndex == 2 ? 14 : 13,
+                              ),
+                            ),
+                            AnimatedOpacity(
+                              duration: Duration(milliseconds: 200),
+                              opacity: selectedTabIndex == 2 ? 1.0 : 0.0,
+                              child: Container(
+                                margin: EdgeInsets.only(top: 4),
+                                height: 3,
+                                width: 36,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const Divider(height: 15),
-              SizedBox(height: 10,),
+
               Expanded(
                 child: Builder(
                   builder: (_) {
@@ -2050,7 +2715,7 @@ class _MyPageMainState extends State<MyPageMain> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 10,
+            bottom: 30,
             child: BottomNavBar(
               currentIndex: 4,
               onTap: (index) {
