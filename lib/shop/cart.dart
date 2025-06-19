@@ -37,14 +37,6 @@ class _CartPageState extends State<CartPage> {
         leading: const BackButton(),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.push(context,
-                MaterialPageRoute(builder: (context) => const AdminProductPage()),
-              ); // 또는 직접 위젯 호출
-            },
-            child: const Text('관리자', style: TextStyle(color: Colors.black)),
-          ),
-          TextButton(
             onPressed: () async {
               final selectedIds = selected.entries
                   .where((entry) => entry.value)
@@ -151,7 +143,7 @@ class _CartPageState extends State<CartPage> {
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(10),
-                                  child: Image.asset(
+                                  child: Image.network(
                                     data['thumbNail'],
                                     width: double.infinity,
                                     height: 100,
