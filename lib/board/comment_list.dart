@@ -19,8 +19,11 @@ class CommentList extends StatefulWidget {
   State<CommentList> createState() => _CommentListState();
 }
 
-class _CommentListState extends State<CommentList> {
+class _CommentListState extends State<CommentList> with AutomaticKeepAliveClientMixin {
   final Map<String, bool> expandedStates = {};
+
+  @override
+  bool get wantKeepAlive => true;
 
   Future<void> _deleteComment(String commentId) async {
     await FirebaseFirestore.instance
@@ -33,6 +36,8 @@ class _CommentListState extends State<CommentList> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     if (widget.boardId.isEmpty) {
       return const Text('boardId가 비어있습니다.');
     }
@@ -79,64 +84,23 @@ class _CommentListState extends State<CommentList> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    FutureBuilder<DocumentSnapshot>(
-                      future: FirebaseFirestore.instance.collection('users').doc(userId).get(),
-                      builder: (context, userSnapshot) {
-                        String? imgPath;
-                        if (userSnapshot.hasData && userSnapshot.data!.exists) {
-                          final userData = userSnapshot.data!.data() as Map<String, dynamic>;
-                          imgPath = userData['imgPath'];
-                        }
-                        return CircleAvatar(
-                          radius: 18,
-                          backgroundColor: const Color(0xFFE0E0E0),
-                          backgroundImage: (imgPath != null && imgPath.isNotEmpty) ? NetworkImage(imgPath) : null,
-                          child: (imgPath == null || imgPath.isEmpty)
-                              ? const Icon(Icons.person, size: 20, color: Colors.grey)
-                              : null,
-                        );
-                      },
-                    ),
+                    _buildUserAvatar(userId),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(data['nickName'] ?? '익명', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  const SizedBox(width: 6),
-                                  Text('· $timeAgo', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                  if (updatedAt != null)
-                                    const Text(' · 수정됨', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                ],
-                              ),
-                              if (isMine)
-                                PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    if (value == 'edit') {
-                                      widget.onEdit?.call(reply.id, data['content']);
-                                    } else if (value == 'delete') {
-                                      _deleteComment(reply.id);
-                                    }
-                                  },
-                                  itemBuilder: (context) => const [
-                                    PopupMenuItem(value: 'edit', child: Text('수정')),
-                                    PopupMenuItem(value: 'delete', child: Text('삭제')),
-                                  ],
-                                ),
-                            ],
-                          ),
+                          _buildCommentHeader(data, timeAgo, updatedAt, isMine, () {
+                            widget.onEdit?.call(reply.id, data['content']);
+                          }, () {
+                            _deleteComment(reply.id);
+                          }),
                           const SizedBox(height: 4),
                           Text(data['content'] ?? ''),
                           TextButton(
+                            style: TextButton.styleFrom(foregroundColor: Colors.black),
                             onPressed: () {
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                widget.onReplyTargetChanged?.call(reply.id, data['nickName'] ?? '');
-                              });
+                              widget.onReplyTargetChanged?.call(reply.id, data['nickName'] ?? '');
                             },
                             child: const Text('답글 달기'),
                           ),
@@ -165,62 +129,17 @@ class _CommentListState extends State<CommentList> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance.collection('users').doc(userId).get(),
-                    builder: (context, userSnapshot) {
-                      String? imgPath;
-                      if (userSnapshot.hasData && userSnapshot.data!.exists) {
-                        final userData = userSnapshot.data!.data() as Map<String, dynamic>;
-                        imgPath = userData['imgPath'];
-                      }
-                      return CircleAvatar(
-                        radius: 20,
-                        backgroundColor: const Color(0xFFE0E0E0),
-                        backgroundImage: (imgPath != null && imgPath.isNotEmpty) ? NetworkImage(imgPath) : null,
-                        child: (imgPath == null || imgPath.isEmpty)
-                            ? const Icon(Icons.person, size: 20, color: Colors.grey)
-                            : null,
-                      );
-                    },
-                  ),
+                  _buildUserAvatar(userId),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Text(data['nickName'] ?? '익명', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                const SizedBox(width: 6),
-                                Text('· $timeAgo', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                if (updatedAt != null)
-                                  const Text(' · 수정됨', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                              ],
-                            ),
-                            if (isMine)
-                              PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  if (value == 'edit') {
-                                    widget.onEdit?.call(parent.id, data['content']);
-                                  } else if (value == 'delete') {
-                                    FirebaseFirestore.instance
-                                        .collection('boards')
-                                        .doc(widget.boardId)
-                                        .collection('comments')
-                                        .doc(parent.id)
-                                        .delete();
-                                  }
-                                },
-                                itemBuilder: (context) => const [
-                                  PopupMenuItem(value: 'edit', child: Text('수정')),
-                                  PopupMenuItem(value: 'delete', child: Text('삭제')),
-                                ],
-                              ),
-                          ],
-                        ),
+                        _buildCommentHeader(data, timeAgo, updatedAt, isMine, () {
+                          widget.onEdit?.call(parent.id, data['content']);
+                        }, () {
+                          _deleteComment(parent.id);
+                        }),
                         const SizedBox(height: 4),
                         Text(data['content'] ?? ''),
                         Row(
@@ -239,10 +158,9 @@ class _CommentListState extends State<CommentList> {
                               ),
                             ),
                             TextButton(
+                              style: TextButton.styleFrom(foregroundColor: Colors.black),
                               onPressed: () {
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                  widget.onReplyTargetChanged?.call(parent.id, data['nickName'] ?? '');
-                                });
+                                widget.onReplyTargetChanged?.call(parent.id, data['nickName'] ?? '');
                               },
                               child: const Text('답글 달기'),
                             ),
@@ -263,6 +181,65 @@ class _CommentListState extends State<CommentList> {
 
         return Column(children: commentWidgets);
       },
+    );
+  }
+
+  Widget _buildUserAvatar(String userId) {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection('users').doc(userId).get(),
+      builder: (context, userSnapshot) {
+        String? imgPath;
+        if (userSnapshot.hasData && userSnapshot.data!.exists) {
+          final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+          imgPath = userData['imgPath'];
+        }
+        return CircleAvatar(
+          radius: 18,
+          backgroundColor: const Color(0xFFE0E0E0),
+          backgroundImage: (imgPath != null && imgPath.isNotEmpty) ? NetworkImage(imgPath) : null,
+          child: (imgPath == null || imgPath.isEmpty)
+              ? const Icon(Icons.person, size: 20, color: Colors.grey)
+              : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildCommentHeader(
+      Map<String, dynamic> data,
+      String timeAgo,
+      DateTime? updatedAt,
+      bool isMine,
+      VoidCallback onEdit,
+      VoidCallback onDelete,
+      ) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Text(data['nickName'] ?? '익명', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(width: 6),
+            Text('· $timeAgo', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            if (updatedAt != null)
+              const Text(' · 수정됨', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+        if (isMine)
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'edit') {
+                onEdit();
+              } else if (value == 'delete') {
+                onDelete();
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'edit', child: Text('수정')),
+              PopupMenuItem(value: 'delete', child: Text('삭제')),
+            ],
+          ),
+      ],
     );
   }
 

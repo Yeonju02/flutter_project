@@ -41,11 +41,6 @@ class AdminBottomNavBar extends StatelessWidget {
           activeIcon: Image.asset('assets/shop_selected.png', width: 24, height: 24),
           label: '상품',
         ),
-        BottomNavigationBarItem(
-          icon: Image.asset('assets/review.png', width: 24, height: 24),
-          activeIcon: Image.asset('assets/review_selected.png', width: 24, height: 24),
-          label: '리뷰',
-        ),
       ],
       onTap: onTap,
     );

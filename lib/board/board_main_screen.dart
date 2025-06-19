@@ -28,6 +28,56 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
   String _sortOption = '최신글';
   final List<String> _categories = ['전체', '아침 루틴 후기/공유', '수면 관리 후기/공유', '제품/영상 추천', '공지사항'];
 
+  void _handlePostMenuSelection(String value, Map<String, dynamic> post) async {
+    if (!mounted) return; // 위젯이 아직 살아있을 때만 실행
+
+    if (value == 'edit') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => BoardWriteScreen(post: post)),
+      );
+    } else if (value == 'delete') {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text(
+            '삭제 확인',
+            style: TextStyle(color: Colors.black),
+          ),
+          content: const Text(
+            '이 게시글을 삭제하시겠습니까?',
+            style: TextStyle(color: Colors.black),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('취소', style: TextStyle(color: Colors.black)),
+              onPressed: () => Navigator.pop(context, false),
+            ),
+            TextButton(
+              child: const Text('삭제', style: TextStyle(color: Colors.black)),
+              onPressed: () => Navigator.pop(context, true),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        await FirebaseFirestore.instance
+            .collection('boards')
+            .doc(post['boardId'])
+            .update({'isDeleted': true});
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('게시글이 삭제되었습니다.')),
+        );
+
+        setState(() {});
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -167,18 +217,12 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                   },
                 ),
               ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => AdminBoardPage()));
-                },
-                child: const Text("일단 게시판관리 페이지 여기서 이동"),
-              ),
             ],
           ),
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: 30,
             child: BottomNavBar(
               currentIndex: 1,
               onTap: (index) {
@@ -334,6 +378,7 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
     final userId = user?.uid ?? '';
     final boardDoc = FirebaseFirestore.instance.collection('boards').doc(post['boardId']);
     final likeDoc = boardDoc.collection('likes').doc(userId);
+    final isNotice = post['boardCategory'] == '공지사항';
 
     bool isExpanded = false;
 
@@ -354,6 +399,8 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
               final userData = userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
               final level = userData['level'] != null ? 'LV.${userData['level']}' : 'LV.?';
               final String? profileImg = userData['imgPath'];
+              final isAdmin = userData['status'] == 'A';
+
 
               return Card(
                 color: const Color(0xFFE7F3FF),
@@ -385,7 +432,19 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                 const SizedBox(width: 8),
                                 Text(post['nickName'] ?? '익명', style: const TextStyle(fontWeight: FontWeight.bold)),
                                 const SizedBox(width: 8),
-                                Text(level, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                isAdmin && isNotice
+                                    ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blueGrey,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    '공지사항',
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
+                                )
+                                    : Text(level, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                               ],
                             ),
                             Row(
@@ -398,49 +457,29 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                 if (userId == post['userId'])
                                   PopupMenuButton<String>(
                                     padding: EdgeInsets.zero,
-                                    onSelected: (value) async {
-                                      if (value == 'edit') {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => BoardWriteScreen(post: post),
-                                          ),
-                                        );
-                                      } else if (value == 'delete') {
-                                        final confirm = await showDialog<bool>(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text('삭제 확인'),
-                                            content: const Text('이 게시글을 삭제하시겠습니까?'),
-                                            actions: [
-                                              TextButton(child: const Text('취소'), onPressed: () => Navigator.pop(context, false)),
-                                              TextButton(child: const Text('삭제'), onPressed: () => Navigator.pop(context, true)),
-                                            ],
-                                          ),
-                                        );
-
-                                        if (confirm == true) {
-                                          await FirebaseFirestore.instance
-                                              .collection('boards')
-                                              .doc(post['boardId'])
-                                              .update({'isDeleted': true});
-
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('게시글이 삭제되었습니다.')),
-                                            );
-                                          }
-
-                                          setState(() {});
-                                        }
-                                      }
-                                    },
+                                    color: const Color(0xFF92BBE2),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    onSelected: (value) => _handlePostMenuSelection(value, post), // 🔁 여기에 함수 연결
                                     itemBuilder: (context) => [
-                                      const PopupMenuItem(value: 'edit', child: Text('수정')),
-                                      const PopupMenuItem(value: 'delete', child: Text('삭제')),
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Padding(
+                                          padding: EdgeInsets.symmetric(horizontal: 4),
+                                          child: Text('수정', style: TextStyle(color: Colors.white)),
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Padding(
+                                          padding: EdgeInsets.symmetric(horizontal: 4),
+                                          child: Text('삭제', style: TextStyle(color: Colors.white)),
+                                        ),
+                                      ),
                                     ],
                                     icon: const Icon(Icons.more_vert),
-                                  ),
+                                  )
                               ],
                             ),
                           ],

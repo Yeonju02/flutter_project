@@ -30,7 +30,6 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     _loadMyNickName();
   }
 
-  // 답글 타겟 지정
   void _setReplyTarget(String commentId, String nickname) {
     setState(() {
       _replyToId = commentId;
@@ -38,7 +37,6 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     });
   }
 
-  // 답글 종료 시 초기화
   void _clearReplyTarget() {
     setState(() {
       _replyToId = null;
@@ -115,6 +113,36 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     }
   }
 
+  void _showPostOptions(BuildContext context, String boardId) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('수정'),
+              onTap: () => Navigator.pop(context, 'edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete),
+              title: const Text('삭제'),
+              onTap: () => Navigator.pop(context, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (selected == 'edit') {
+      // 수정 로직 연결
+    } else if (selected == 'delete') {
+      await FirebaseFirestore.instance.collection('boards').doc(boardId).delete();
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (myNickName == null) {
@@ -151,11 +179,11 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                   }
 
                   final data = snapshot.data!.data() as Map<String, dynamic>;
+                  final currentUser = FirebaseAuth.instance.currentUser;
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 좋아요 및 신고 포함 유저 정보
                       FutureBuilder<DocumentSnapshot>(
                         future: FirebaseFirestore.instance.collection('users').doc(data['userId']).get(),
                         builder: (context, userSnapshot) {
@@ -249,10 +277,16 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                                               }
                                             },
                                           ),
-                                          IconButton(
-                                            icon: const Icon(LucideIcons.alertTriangle, size: 26, color: Colors.blueGrey),
-                                            onPressed: () => _reportBoard(context, widget.boardId),
-                                          ),
+                                          if (currentUser?.uid != data['userId'])
+                                            IconButton(
+                                              icon: const Icon(LucideIcons.alertTriangle, size: 26, color: Colors.blueGrey),
+                                              onPressed: () => _reportBoard(context, widget.boardId),
+                                            ),
+                                          if (currentUser?.uid == data['userId'])
+                                            IconButton(
+                                              icon: const Icon(Icons.more_vert, size: 26, color: Colors.grey),
+                                              onPressed: () => _showPostOptions(context, widget.boardId),
+                                            ),
                                         ],
                                       ),
                                     ],

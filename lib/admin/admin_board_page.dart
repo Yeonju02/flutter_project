@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:routinelogapp/admin/report_list_page.dart';
+import '../custom/admin_bottom_bar.dart';
+import '../main/main_page.dart';
+import 'admin_dashboard_page.dart';
+import 'admin_product_page.dart';
+import 'admin_user_page.dart';
 
 class AdminBoardPage extends StatefulWidget {
   const AdminBoardPage({super.key});
@@ -17,9 +22,9 @@ class _AdminBoardPageState extends State<AdminBoardPage> {
   DateTimeRange? _selectedRange;
   List<QueryDocumentSnapshot> _fetchedData = [];
 
-  final Color mainColor = const Color(0xFF92BBE2);
+  final Color mainColor = const Color(0xFF819CFF); // 통일된 색상
   final OutlineInputBorder borderStyle = OutlineInputBorder(
-    borderSide: BorderSide(color: Color(0xFF92BBE2)),
+    borderSide: const BorderSide(color: Color(0xFF819CFF)),
     borderRadius: BorderRadius.circular(12),
   );
 
@@ -105,141 +110,184 @@ class _AdminBoardPageState extends State<AdminBoardPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('게시판 관리', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+        backgroundColor: mainColor,
+        title: Row(
+          children: [
+            Image.asset('assets/logo.png', height: 28),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MainPage())),
+              child: const Text('Main', style: TextStyle(color: Colors.white, fontSize: 16)),
+            ),
+          ],
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildStatCard(),
             const SizedBox(height: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  decoration: InputDecoration(
-                    labelText: '제목',
-                    border: borderStyle,
-                    focusedBorder: borderStyle,
-                  ),
-                  onChanged: (value) => _title = value,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        decoration: InputDecoration(
-                          labelText: '작성자',
-                          border: borderStyle,
-                          focusedBorder: borderStyle,
-                        ),
-                        onChanged: (value) => _author = value,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedType,
-                        decoration: InputDecoration(
-                          labelText: '종류',
-                          border: borderStyle,
-                          focusedBorder: borderStyle,
-                        ),
-                        items: _types.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
-                        onChanged: (value) => setState(() {
-                          _selectedType = value!;
-                          _fetchData();
-                        }),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: mainColor),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () async {
-                      final picked = await showDateRangePicker(
-                        context: context,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) {
-                        setState(() => _selectedRange = picked);
-                        _fetchData();
-                      }
-                    },
-                    child: Text(
-                      _selectedRange == null
-                          ? '날짜 선택'
-                          : '${_selectedRange!.start.toString().split(' ')[0]} ~ ${_selectedRange!.end.toString().split(' ')[0]}',
-                      style: const TextStyle(color: Color(0xFF1A1C34)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: mainColor,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: _fetchData,
-                    child: const Text('검색'),
-                  ),
-                ),
-              ],
-            ),
+            _buildFilterSection(),
             const SizedBox(height: 16),
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowColor: MaterialStateProperty.all(mainColor.withOpacity(0.1)),
-                    border: TableBorder.all(width: 0.5, color: mainColor),
-                    columns: const [
-                      DataColumn(label: Text('작성자')),
-                      DataColumn(label: Text('제목')),
-                      DataColumn(label: Text('작성일')),
-                      DataColumn(label: Text('상태')),
-                      DataColumn(label: Text('관리')),
-                    ],
-                    rows: _fetchedData.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
-                      return DataRow(cells: [
-                        DataCell(Text(data['nickName'] ?? '익명')),
-                        DataCell(Text(data['title'] ?? data['content'] ?? '')),
-                        DataCell(Text(createdAt != null ? createdAt.toString().split(' ')[0] : '-')),
-                        DataCell(Text(data['isDeleted'] == true ? '삭제됨' : '정상')),
-                        DataCell(IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _deleteItem(doc.reference.path.split('/').last, data.containsKey('title')),
-                        )),
-                      ]);
-                    }).toList(),
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(height: 16),
+            Expanded(child: _buildDataTable()),
+            const SizedBox(height: 16),
             ElevatedButton(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => ReportListScreen()));
-                },
-                child: Text("신고 목록")
+              style: ElevatedButton.styleFrom(
+                backgroundColor: mainColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportListScreen()));
+              },
+              child: const Text("신고 목록", style: TextStyle(color: Colors.white)),
             )
           ],
+        ),
+      ),
+      bottomNavigationBar: AdminBottomNavBar(
+        currentIndex: 2, // 현재 탭: 게시판
+        onTap: (index) {
+          switch (index) {
+            case 0:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const UserAdminPage()));
+              break;
+            case 1:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminDashboardPage()));
+              break;
+            case 2:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminBoardPage()));
+              break;
+            case 3:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminProductPage()));
+              break;
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildFilterSection() {
+    return Column(
+      children: [
+        TextField(
+          decoration: InputDecoration(
+            labelText: '제목',
+            filled: true,
+            fillColor: const Color(0xFFF0F4FA),
+            border: borderStyle,
+            focusedBorder: borderStyle,
+          ),
+          onChanged: (value) => _title = value,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                decoration: InputDecoration(
+                  labelText: '작성자',
+                  filled: true,
+                  fillColor: const Color(0xFFF0F4FA),
+                  border: borderStyle,
+                  focusedBorder: borderStyle,
+                ),
+                onChanged: (value) => _author = value,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _selectedType,
+                decoration: InputDecoration(
+                  labelText: '종류',
+                  filled: true,
+                  fillColor: const Color(0xFFF0F4FA),
+                  border: borderStyle,
+                  focusedBorder: borderStyle,
+                ),
+                items: _types.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+                onChanged: (value) => setState(() {
+                  _selectedType = value!;
+                  _fetchData();
+                }),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: mainColor),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) {
+                setState(() => _selectedRange = picked);
+                _fetchData();
+              }
+            },
+            child: Text(
+              _selectedRange == null
+                  ? '날짜 선택'
+                  : '${_selectedRange!.start.toString().split(' ')[0]} ~ ${_selectedRange!.end.toString().split(' ')[0]}',
+              style: const TextStyle(color: Color(0xFF1A1C34)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: mainColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: _fetchData,
+            child: const Text('검색', style: TextStyle(color: Colors.white)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDataTable() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.vertical,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: MaterialStateProperty.all(mainColor.withOpacity(0.1)),
+          border: TableBorder.all(width: 0.5, color: mainColor),
+          columns: const [
+            DataColumn(label: Text('작성자')),
+            DataColumn(label: Text('제목')),
+            DataColumn(label: Text('작성일')),
+            DataColumn(label: Text('상태')),
+            DataColumn(label: Text('관리')),
+          ],
+          rows: _fetchedData.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
+            return DataRow(cells: [
+              DataCell(Text(data['nickName'] ?? '익명')),
+              DataCell(Text(data['title'] ?? data['content'] ?? '')),
+              DataCell(Text(createdAt != null ? createdAt.toString().split(' ')[0] : '-')),
+              DataCell(Text(data['isDeleted'] == true ? '삭제됨' : '정상')),
+              DataCell(IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () => _deleteItem(doc.reference.path.split('/').last, data.containsKey('title')),
+              )),
+            ]);
+          }).toList(),
         ),
       ),
     );
@@ -256,22 +304,21 @@ class _AdminBoardPageState extends State<AdminBoardPage> {
         final data = snapshot.data!.data()! as Map<String, dynamic>;
         final totalBoard = data['totalBoard'] ?? 0;
 
-        return Card(
-          elevation: 2,
-          color: const Color(0xFF92BBE2).withOpacity(0.2),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                const Icon(Icons.article, color: Color(0xFF92BBE2)),
-                const SizedBox(width: 12),
-                Text(
-                  '전체 게시글 수: $totalBoard개',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F4FA),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.article, color: Color(0xFF819CFF)),
+              const SizedBox(width: 12),
+              Text(
+                '전체 게시글 수: $totalBoard개',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
         );
       },
