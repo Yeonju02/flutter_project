@@ -104,11 +104,12 @@ class NotificationScreen extends StatelessWidget {
     final boardId = data['boardId'];
     final isRead = data['isRead'] ?? false;
     final createdAt = (data['createdAt'] as Timestamp).toDate();
+    final notiNick = data['notiNick'] ?? '익명';
+    final notiImg = data['notiImg'] ?? '';
 
     return InkWell(
       onTap: () async {
         if (boardId != null && (notiType == 'like' || notiType == 'comment')) {
-          // 알림을 읽음 처리
           await FirebaseFirestore.instance
               .collection('users')
               .doc(FirebaseAuth.instance.currentUser!.uid)
@@ -116,7 +117,6 @@ class NotificationScreen extends StatelessWidget {
               .doc(doc.id)
               .update({'isRead': true});
 
-          // 게시글 상세로 이동
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => BoardDetailScreen(boardId: boardId)),
@@ -128,9 +128,13 @@ class NotificationScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            const CircleAvatar(
-              radius: 24,
-              backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: const Color(0xFFE0E0E0),
+              backgroundImage: notiImg.isNotEmpty ? NetworkImage(notiImg) : null,
+              child: notiImg.isEmpty
+                  ? const Icon(Icons.person, size: 20, color: Colors.grey)
+                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -139,7 +143,8 @@ class NotificationScreen extends StatelessWidget {
                 children: [
                   Text(notiMsg ?? '', style: const TextStyle(fontSize: 14)),
                   const SizedBox(height: 4),
-                  Text(_formatTimeAgo(createdAt), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(_formatTimeAgo(createdAt),
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ),

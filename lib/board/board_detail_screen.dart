@@ -21,10 +21,29 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   final PageController _pageController = PageController();
   String? myNickName;
 
+  String? _replyToId;
+  String? _replyToNickname;
+
   @override
   void initState() {
     super.initState();
     _loadMyNickName();
+  }
+
+  // 답글 타겟 지정
+  void _setReplyTarget(String commentId, String nickname) {
+    setState(() {
+      _replyToId = commentId;
+      _replyToNickname = nickname;
+    });
+  }
+
+  // 답글 종료 시 초기화
+  void _clearReplyTarget() {
+    setState(() {
+      _replyToId = null;
+      _replyToNickname = null;
+    });
   }
 
   Future<void> _loadMyNickName() async {
@@ -291,7 +310,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                       CommentList(
                         boardId: widget.boardId,
                         myNickName: myNickName,
-                        onReplyTargetChanged: (id, nick) {},
+                        onReplyTargetChanged: _setReplyTarget,
                         onEdit: (id, content) {},
                       )
                     ],
@@ -300,7 +319,12 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
               ),
             ),
           ),
-          CommentInputBar(boardId: widget.boardId),
+          CommentInputBar(
+            boardId: widget.boardId,
+            replyToId: _replyToId,
+            replyToNickname: _replyToNickname,
+            onCancelReply: _clearReplyTarget,
+          ),
         ],
       ),
     );

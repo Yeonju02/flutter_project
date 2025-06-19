@@ -9,6 +9,7 @@ class CommentInputBar extends StatefulWidget {
   final String? editTargetId;
   final String? editInitialContent;
   final VoidCallback? onSubmitted;
+  final VoidCallback? onCancelReply;
 
   const CommentInputBar({
     super.key,
@@ -18,6 +19,7 @@ class CommentInputBar extends StatefulWidget {
     this.editTargetId,
     this.editInitialContent,
     this.onSubmitted,
+    this.onCancelReply,
   });
 
   @override
@@ -26,49 +28,41 @@ class CommentInputBar extends StatefulWidget {
 
 class _CommentInputBarState extends State<CommentInputBar> {
   late TextEditingController _controller;
-  final FocusNode _focusNode = FocusNode(); // FocusNode 추가
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController();
-    print('CommentInputBar initState 호출됨'); // 추가
     _updateControllerText();
   }
 
   @override
   void didUpdateWidget(covariant CommentInputBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    print('CommentInputBar didUpdateWidget 호출됨'); // 추가
     if (widget.replyToId != oldWidget.replyToId ||
         widget.replyToNickname != oldWidget.replyToNickname ||
         widget.editTargetId != oldWidget.editTargetId ||
         widget.editInitialContent != oldWidget.editInitialContent) {
-      print('CommentInputBar 속성 변경 감지, _updateControllerText 호출'); // 추가
       _updateControllerText();
     }
   }
 
-  // 컨트롤러의 텍스트와 선택 영역을 업데이트하는 함수
   void _updateControllerText() {
     String newText = '';
     if (widget.editInitialContent != null) {
-      // 수정 모드
       newText = widget.editInitialContent!;
     } else if (widget.replyToNickname != null) {
-      // 답글 모드
       newText = '@${widget.replyToNickname} ';
     }
 
-    // 현재 텍스트와 다를 경우에만 업데이트하여 불필요한 렌더링 방지
     if (_controller.text != newText) {
       _controller.text = newText;
       _controller.selection = TextSelection.fromPosition(
-        TextPosition(offset: _controller.text.length), // 커서를 텍스트 끝으로 이동
+        TextPosition(offset: _controller.text.length),
       );
     }
 
-    // 답글 또는 수정 모드일 때 포커스 요청
     if (widget.replyToId != null || widget.editTargetId != null) {
       _focusNode.requestFocus();
     }
@@ -80,72 +74,171 @@ class _CommentInputBarState extends State<CommentInputBar> {
     if (content.isEmpty || user == null) return;
 
     final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    final nickName = userDoc['nickName'];
+    final nickName = userDoc['nickName'] ?? '';
+    final imgPath = userDoc['imgPath'] ?? '';
     final commentsRef = FirebaseFirestore.instance.collection('boards').doc(widget.boardId).collection('comments');
 
     if (widget.editTargetId != null) {
-      // 댓글 수정
       await commentsRef.doc(widget.editTargetId).update({
         'content': content,
         'updatedAt': Timestamp.now(),
       });
     } else {
-      // 새 댓글 또는 답글 추가
-      await commentsRef.add({
+      final newComment = await commentsRef.add({
         'nickName': nickName,
         'content': content,
         'parentId': widget.replyToId,
         'createdAt': Timestamp.now(),
         'userId': user.uid,
       });
+
+      if (widget.replyToId != null) {
+        final parentCommentSnap = await commentsRef.doc(widget.replyToId!).get();
+        final parentData = parentCommentSnap.data() as Map<String, dynamic>?;
+        final receiverId = parentData?['userId'];
+
+        if (receiverId != null && receiverId != user.uid) {
+          final notiSettingSnap = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(receiverId)
+              .collection('notiSettings')
+              .doc('main')
+              .get();
+          final settings = notiSettingSnap.data();
+          final isEnabled = settings?['comment'] ?? true;
+
+          if (isEnabled) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(receiverId)
+                .collection('notifications')
+                .add({
+              'notiType': 'comment',
+              'notiMsg': '$nickName님이 회원님의 댓글에 답글을 남겼습니다.',
+              'boardId': widget.boardId,
+              'commentId': newComment.id,
+              'createdAt': Timestamp.now(),
+              'isRead': false,
+              'notiNick': nickName,
+              'notiImg': imgPath,
+            });
+          }
+        }
+      } else {
+        final boardSnap = await FirebaseFirestore.instance.collection('boards').doc(widget.boardId).get();
+        final boardData = boardSnap.data() as Map<String, dynamic>?;
+        final boardOwnerId = boardData?['userId'];
+
+        if (boardOwnerId != null && boardOwnerId != user.uid) {
+          final notiSettingSnap = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(boardOwnerId)
+              .collection('notiSettings')
+              .doc('main')
+              .get();
+          final settings = notiSettingSnap.data();
+          final isEnabled = settings?['comment'] ?? true;
+
+          if (isEnabled) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(boardOwnerId)
+                .collection('notifications')
+                .add({
+              'notiType': 'comment',
+              'notiMsg': '$nickName님이 회원님의 게시글에 댓글을 남겼습니다.',
+              'boardId': widget.boardId,
+              'commentId': newComment.id,
+              'createdAt': Timestamp.now(),
+              'isRead': false,
+              'notiNick': nickName,
+              'notiImg': imgPath,
+            });
+          }
+        }
+      }
     }
 
-    _controller.clear(); // 입력 필드 비우기
-    widget.onSubmitted?.call(); // 콜백 호출
-    _focusNode.unfocus(); // 제출 후 키보드 내리기
+    _controller.clear();
+    widget.onSubmitted?.call();
+    widget.onCancelReply?.call();
+    _focusNode.unfocus();
+  }
+
+  void _cancelReply() {
+    _controller.clear();
+    widget.onCancelReply?.call();
+    FocusScope.of(context).unfocus();
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _focusNode.dispose(); // FocusNode 폐기
+    _focusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        color: Colors.white,
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                focusNode: _focusNode, // TextField에 FocusNode 할당
-                controller: _controller,
-                decoration: InputDecoration(
-                  hintText: widget.replyToNickname != null
-                      ? '@${widget.replyToNickname}에게 답글 달기...'
-                      : '댓글을 입력하세요...',
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.replyToNickname != null)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F0FE),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('@${widget.replyToNickname}에게 답글 중',
+                      style: const TextStyle(color: Colors.black87)),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: _cancelReply,
+                  ),
+                ],
+              ),
+            ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    focusNode: _focusNode,
+                    controller: _controller,
+                    decoration: InputDecoration(
+                      hintText: widget.replyToNickname != null
+                          ? '@${widget.replyToNickname}에게 답글 달기...'
+                          : '댓글을 입력하세요...',
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _submitComment,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF92BBE0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  child: const Text('등록', style: TextStyle(color: Colors.white)),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: _submitComment,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF92BBE0),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              ),
-              child: const Text('등록', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
