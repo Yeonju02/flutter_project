@@ -23,24 +23,49 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
   List<XFile> _images = [];
   bool _isUploading = false;
 
-  final List<String> _categories = ['아침 루틴 후기/공유', '수면 관리 후기/공유', '제품/영상 추천'];
+  final List<String> baseCategories = ['아침 루틴 후기/공유', '수면 관리 후기/공유', '제품/영상 추천'];
+  bool? _isAdmin; // null = 로딩 중
 
   bool get isEditMode => widget.post != null;
+
+  List<String> get _categories {
+    final result = _isAdmin == true ? [...baseCategories, '공지사항'] : baseCategories;
+    return result;
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadUserRole();
 
     if (isEditMode) {
       _titleController.text = widget.post!['title'] ?? '';
       _contentController.text = widget.post!['content'] ?? '';
       _selectedCategory = widget.post!['boardCategory'];
+    } else {
+      _selectedCategory = '아침 루틴 후기/공유';
     }
   }
 
+  Future<void> _loadUserRole() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    final status = doc.data()?['status'];
+
+    setState(() {
+      _isAdmin = status == 'A';
+
+      if (_isAdmin != true && _selectedCategory == '공지사항') {
+        _selectedCategory = '아침 루틴 후기/공유';
+      }
+    });
+  }
+
   Future<void> _pickImages() async {
-    final ImagePicker picker = ImagePicker();
-    final List<XFile> picked = await picker.pickMultiImage();
+    final picker = ImagePicker();
+    final picked = await picker.pickMultiImage();
     if (picked.isNotEmpty) {
       setState(() {
         _images = picked;
@@ -52,8 +77,8 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
     List<Map<String, dynamic>> fileInfoList = [];
 
     for (int i = 0; i < _images.length; i++) {
-      XFile image = _images[i];
-      String fileName = const Uuid().v4();
+      final image = _images[i];
+      final fileName = const Uuid().v4();
       final ref = FirebaseStorage.instance.ref().child('board_images/$fileName.jpg');
       final uploadTask = await ref.putFile(File(image.path));
       final fileUrl = await uploadTask.ref.getDownloadURL();
@@ -82,20 +107,9 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('로그인된 사용자가 없습니다.');
 
-      if (user == null) {
-        throw Exception('로그인된 사용자가 없습니다.');
-      }
-
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-
-      if (!userDoc.exists) {
-        throw Exception('사용자 정보가 존재하지 않습니다.');
-      }
-
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       final nickName = userDoc.data()?['nickName'] ?? '익명';
       final now = Timestamp.now();
 
@@ -106,10 +120,10 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
           'content': _contentController.text,
           'boardCategory': _selectedCategory,
           'updatedAt': now,
+          if (_selectedCategory == '공지사항') 'status': 'A',
         });
       } else {
         final boardId = const Uuid().v4();
-
         await FirebaseFirestore.instance.collection('boards').doc(boardId).set({
           'boardId': boardId,
           'userId': user.uid,
@@ -121,9 +135,10 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
           'createdAt': now,
           'updatedAt': now,
           'isDeleted': false,
+          if (_selectedCategory == '공지사항') 'status': 'A',
         });
 
-        List<Map<String, dynamic>> imageInfoList = await _uploadImagesToStorage(boardId);
+        final imageInfoList = await _uploadImagesToStorage(boardId);
         for (var imageData in imageInfoList) {
           await FirebaseFirestore.instance
               .collection('boards')
@@ -154,10 +169,11 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(isEditMode ? '글 수정' : '글 작성', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text(isEditMode ? '글 수정' : '글 작성',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: Colors.white,
       ),
-      body: _isUploading
+      body: _isUploading || _isAdmin == null
           ? const Center(child: CircularProgressIndicator())
           : Padding(
         padding: const EdgeInsets.all(20.0),
@@ -177,16 +193,15 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
             const SizedBox(height: 20),
             DropdownButton2<String>(
               isExpanded: true,
-              value: _selectedCategory,
-              items: _categories.map((item) => DropdownMenuItem<String>(
-                value: item,
-                child: Text(item, style: const TextStyle(fontWeight: FontWeight.bold)),
-              )).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedCategory = value;
-                });
-              },
+              value: _categories.contains(_selectedCategory) ? _selectedCategory : null,
+              hint: const Text('카테고리 선택'),
+              items: _categories.map((item) {
+                return DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(item, style: const TextStyle(fontWeight: FontWeight.bold)),
+                );
+              }).toList(),
+              onChanged: (value) => setState(() => _selectedCategory = value),
               buttonStyleData: ButtonStyleData(
                 height: 48,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -197,22 +212,18 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
                 ),
               ),
               dropdownStyleData: DropdownStyleData(
-                maxHeight: 160,
+                maxHeight: _isAdmin == true ? 300 : 160, // 관리자면 높이 늘림
                 width: MediaQuery.of(context).size.width - 64,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: const Color(0xFF92BBE2)),
                 ),
-                offset: const Offset(0, -2), // 위치 조정
               ),
               iconStyleData: const IconStyleData(
                 icon: Icon(Icons.arrow_drop_down, color: Colors.black),
               ),
-              style: const TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
             TextField(
@@ -242,13 +253,13 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
+              onPressed: _pickImages,
+              icon: const Icon(Icons.add_photo_alternate),
+              label: const Text('이미지 추가'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.black,
                 side: const BorderSide(color: Color(0xFF92BBE2)),
               ),
-              onPressed: _pickImages,
-              icon: const Icon(Icons.add_photo_alternate),
-              label: const Text('이미지 추가'),
             ),
             const SizedBox(height: 28),
             GestureDetector(
@@ -262,10 +273,7 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
                 alignment: Alignment.center,
                 child: Text(
                   isEditMode ? '수정 완료' : '작성 완료',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               ),
             ),

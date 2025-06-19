@@ -218,8 +218,19 @@ class _CommentInputBarState extends State<CommentInputBar> {
                           ? '@${widget.replyToNickname}에게 답글 달기...'
                           : '댓글을 입력하세요...',
                       contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                      border: OutlineInputBorder(
+                      enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF92BBE0),
+                          width: 2.0,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF92BBE0),
+                          width: 2.5,
+                        ),
                       ),
                     ),
                   ),
