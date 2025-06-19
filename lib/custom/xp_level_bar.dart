@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../utils/lib/route_observer.dart';
 
 class XPLevelBar extends StatefulWidget {
   const XPLevelBar({super.key});
@@ -9,7 +10,7 @@ class XPLevelBar extends StatefulWidget {
   State<XPLevelBar> createState() => _XPLevelBarState();
 }
 
-class _XPLevelBarState extends State<XPLevelBar> {
+class _XPLevelBarState extends State<XPLevelBar> with RouteAware {
   int xp = 0;
   int level = 0;
   bool isLoading = true;
@@ -20,11 +21,33 @@ class _XPLevelBarState extends State<XPLevelBar> {
     _loadXPLevel();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    _loadXPLevel();
+  }
+
   Future<void> _loadXPLevel() async {
+    if (!mounted) return;
+    setState(() => isLoading = true);
+
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId');
 
     if (userId == null) {
+      if (!mounted) return;
       setState(() => isLoading = false);
       return;
     }
@@ -37,12 +60,14 @@ class _XPLevelBarState extends State<XPLevelBar> {
 
     if (query.docs.isNotEmpty) {
       final data = query.docs.first.data();
+      if (!mounted) return;
       setState(() {
         xp = data['xp'] ?? 0;
         level = data['level'] ?? 0;
         isLoading = false;
       });
     } else {
+      if (!mounted) return;
       setState(() => isLoading = false);
     }
   }
@@ -51,7 +76,7 @@ class _XPLevelBarState extends State<XPLevelBar> {
   Widget build(BuildContext context) {
     if (isLoading) return const SizedBox(height: 20);
 
-    double progress = (xp % 100) / 100.0; // 100XP 기준 레벨업
+    double progress = (xp % 100) / 100.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,7 +85,7 @@ class _XPLevelBarState extends State<XPLevelBar> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('루틴 XP   $xp', style: const TextStyle(fontSize: 16)),
-            Text('Lv.$level 갓생러', style: const TextStyle(color: Colors.lightBlue)),
+            Text('Lv.$level   ', style: const TextStyle(color: Colors.lightBlue)),
           ],
         ),
         const SizedBox(height: 6),

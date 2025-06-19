@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-//추후 낮/밤 모드에 맞게 디자인을 설정하도록 하고 선택된 아이템에서는 루틴이 있다는 점이 안뜨는 문제를 해결할것
 class DateItem extends StatelessWidget {
   final DateTime date;
   final bool isSelected;
@@ -25,7 +24,7 @@ class DateItem extends StatelessWidget {
         height: 58,
         margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.black : Colors.white,
+          color: isSelected ? Colors.black : Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(

@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:routinelogapp/board/comment_input_bar.dart';
+import 'package:routinelogapp/board/comment_list.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'board_comment_screen.dart';
-import 'board_write_screen.dart';
-import '../custom/bottom_nav_bar.dart';
-import '../main/main_page.dart';
-import '../notification/notification_screen.dart';
-import '../mypage/myPage_main.dart';
-import '../shop/shop_main.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 class BoardDetailScreen extends StatefulWidget {
   final String boardId;
@@ -23,25 +19,54 @@ class BoardDetailScreen extends StatefulWidget {
 
 class _BoardDetailScreenState extends State<BoardDetailScreen> {
   final PageController _pageController = PageController();
+  String? myNickName;
+
+  String? _replyToId;
+  String? _replyToNickname;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMyNickName();
+  }
+
+  // 답글 타겟 지정
+  void _setReplyTarget(String commentId, String nickname) {
+    setState(() {
+      _replyToId = commentId;
+      _replyToNickname = nickname;
+    });
+  }
+
+  // 답글 종료 시 초기화
+  void _clearReplyTarget() {
+    setState(() {
+      _replyToId = null;
+      _replyToNickname = null;
+    });
+  }
+
+  Future<void> _loadMyNickName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    setState(() {
+      myNickName = userDoc.data()?['nickName'] ?? '익명';
+    });
+  }
 
   Future<void> _onOpenLink(LinkableElement link) async {
     final String rawUrl = link.url.trim();
-
-    debugPrint('클릭된 링크: $rawUrl');
-
     String fixedUrl = rawUrl;
     if (!fixedUrl.startsWith('http://') && !fixedUrl.startsWith('https://')) {
       fixedUrl = 'https://$fixedUrl';
     }
-
     try {
       final Uri uri = Uri.parse(fixedUrl);
-      final launched = await launchUrl(uri);
-      if (!launched) {
-        debugPrint('launch 실패');
-      }
+      await launchUrl(uri);
     } catch (e) {
-      debugPrint('예외 발생: $e');
+      debugPrint('링크 열기 실패: $e');
     }
   }
 
@@ -49,10 +74,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final reportsRef = FirebaseFirestore.instance
-        .collection('boards')
-        .doc(boardId)
-        .collection('reports');
+    final reportsRef = FirebaseFirestore.instance.collection('boards').doc(boardId).collection('reports');
     final existing = await reportsRef.where('reporterId', isEqualTo: user.uid).get();
 
     if (existing.docs.isNotEmpty) {
@@ -95,119 +117,213 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (myNickName == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     final boardDoc = FirebaseFirestore.instance.collection('boards').doc(widget.boardId);
-    final user = FirebaseAuth.instance.currentUser;
-    final likeDoc = boardDoc.collection('likes').doc(user?.uid);
+    final likeDoc = FirebaseFirestore.instance
+        .collection('boards')
+        .doc(widget.boardId)
+        .collection('likes')
+        .doc(FirebaseAuth.instance.currentUser?.uid);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('게시글 상세'),
+        title: const Text('게시글', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 1,
       ),
-      body: Stack(
+      body: Column(
         children: [
-          FutureBuilder<DocumentSnapshot>(
-            future: boardDoc.get(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: FutureBuilder<DocumentSnapshot>(
+                future: boardDoc.get(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-              if (!snapshot.hasData || !snapshot.data!.exists) {
-                return const Center(child: Text('존재하지 않는 게시글입니다.'));
-              }
+                  if (!snapshot.hasData || !snapshot.data!.exists) {
+                    return const Center(child: Text('존재하지 않는 게시글입니다.'));
+                  }
 
-              final data = snapshot.data!.data() as Map<String, dynamic>;
+                  final data = snapshot.data!.data() as Map<String, dynamic>;
 
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                children: [
-                  Row(
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const CircleAvatar(backgroundImage: NetworkImage('https://i.pravatar.cc/100')),
-                      const SizedBox(width: 8),
-                      Text(data['nickName'] ?? '익명', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.report_outlined),
-                        onPressed: () => _reportBoard(context, widget.boardId),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(data['title'] ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  StreamBuilder<QuerySnapshot>(
-                    stream: boardDoc.collection('boardFiles').orderBy('isThumbNail', descending: true).snapshots(),
-                    builder: (context, snap) {
-                      if (!snap.hasData || snap.data!.docs.isEmpty) return const SizedBox.shrink();
-                      final images = snap.data!.docs.map((e) => e['filePath'] as String).toList();
+                      // 좋아요 및 신고 포함 유저 정보
+                      FutureBuilder<DocumentSnapshot>(
+                        future: FirebaseFirestore.instance.collection('users').doc(data['userId']).get(),
+                        builder: (context, userSnapshot) {
+                          String? profileImg;
+                          if (userSnapshot.hasData && userSnapshot.data!.exists) {
+                            final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+                            profileImg = userData['imgPath'];
+                          }
 
-                      return Column(
-                        children: [
-                          SizedBox(
-                            height: 300,
-                            child: PageView.builder(
-                              controller: _pageController,
-                              itemCount: images.length,
-                              itemBuilder: (context, index) => Image.network(images[index], fit: BoxFit.cover),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          SmoothPageIndicator(
-                            controller: _pageController,
-                            count: images.length,
-                            effect: const ScrollingDotsEffect(
-                              activeDotColor: Colors.black,
-                              dotColor: Colors.grey,
-                              dotHeight: 8,
-                              dotWidth: 8,
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: SelectableLinkify(
-                      text: data['content'] ?? '',
-                      onOpen: _onOpenLink,
-                      style: const TextStyle(fontSize: 16, height: 1.6),
-                      linkStyle: const TextStyle(color: Colors.blue),
-                    ),
-                  ),
-                  const Divider(height: 32),
-                  const Text('댓글', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  CommentScreenBody(boardId: widget.boardId),
-                ],
-              );
-            },
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: BottomNavBar(
-              currentIndex: 1,
-              onTap: (index) {
-                if (index == 0) {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const ShopMainPage()));
-                } else if (index == 2) {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const MainPage()));
-                } else if (index == 3) {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationScreen()));
-                } else if (index == 4) {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const MyPageMain()));
-                } else if (index == 1) {
-                  Navigator.pop(context);
-                }
-              },
+                          return StreamBuilder<DocumentSnapshot>(
+                            stream: boardDoc.snapshots(),
+                            builder: (context, boardSnapshot) {
+                              final boardData = boardSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+                              final likeCount = boardData['likeCount'] ?? 0;
+
+                              return StreamBuilder<DocumentSnapshot>(
+                                stream: likeDoc.snapshots(),
+                                builder: (context, snapshot) {
+                                  final isLiked = snapshot.data?.exists ?? false;
+
+                                  return Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 20,
+                                            backgroundColor: const Color(0xFFE0E0E0),
+                                            backgroundImage: (profileImg != null && profileImg.isNotEmpty)
+                                                ? NetworkImage(profileImg)
+                                                : null,
+                                            child: (profileImg == null || profileImg.isEmpty)
+                                                ? const Icon(Icons.person, size: 24, color: Colors.grey)
+                                                : null,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(data['nickName'] ?? '익명', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                      Row(
+                                        children: [
+                                          Text('$likeCount', style: const TextStyle(fontSize: 14)),
+                                          IconButton(
+                                            icon: Icon(
+                                              isLiked ? Icons.favorite : Icons.favorite_border,
+                                              size: 26,
+                                              color: isLiked ? const Color(0xFFF45050) : Colors.grey,
+                                            ),
+                                            onPressed: () async {
+                                              final user = FirebaseAuth.instance.currentUser;
+                                              if (user == null) return;
+
+                                              if (isLiked) {
+                                                await likeDoc.delete();
+                                                await boardDoc.update({'likeCount': FieldValue.increment(-1)});
+                                              } else {
+                                                await likeDoc.set({'likedAt': FieldValue.serverTimestamp()});
+                                                await boardDoc.update({'likeCount': FieldValue.increment(1)});
+
+                                                final receiverUid = data['userId'];
+                                                if (receiverUid != user.uid) {
+                                                  final notiSettingSnap = await FirebaseFirestore.instance
+                                                      .collection('users')
+                                                      .doc(receiverUid)
+                                                      .collection('notiSettings')
+                                                      .doc('main')
+                                                      .get();
+
+                                                  final notiSettings = notiSettingSnap.data();
+                                                  final isLikeEnabled = notiSettings?['like'] ?? true;
+
+                                                  if (isLikeEnabled) {
+                                                    final userDoc = await FirebaseFirestore.instance
+                                                        .collection('users')
+                                                        .doc(user.uid)
+                                                        .get();
+                                                    final nickName = userDoc.data()?['nickName'] ?? '익명';
+                                                    await FirebaseFirestore.instance
+                                                        .collection('users')
+                                                        .doc(receiverUid)
+                                                        .collection('notifications')
+                                                        .add({
+                                                      'notiType': 'like',
+                                                      'notiMsg': '$nickName님이 게시글을 좋아합니다.',
+                                                      'boardId': widget.boardId,
+                                                      'createdAt': FieldValue.serverTimestamp(),
+                                                      'isRead': false,
+                                                    });
+                                                  }
+                                                }
+                                              }
+                                            },
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(LucideIcons.alertTriangle, size: 26, color: Colors.blueGrey),
+                                            onPressed: () => _reportBoard(context, widget.boardId),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Text(data['title'] ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 16),
+                      StreamBuilder<QuerySnapshot>(
+                        stream: boardDoc.collection('boardFiles').orderBy('isThumbNail', descending: true).snapshots(),
+                        builder: (context, snap) {
+                          if (!snap.hasData || snap.data!.docs.isEmpty) return const SizedBox.shrink();
+                          final images = snap.data!.docs.map((e) => e['filePath'] as String).toList();
+
+                          return Column(
+                            children: [
+                              SizedBox(
+                                height: 300,
+                                child: PageView.builder(
+                                  controller: _pageController,
+                                  itemCount: images.length,
+                                  itemBuilder: (context, index) => Image.network(images[index], fit: BoxFit.cover),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SmoothPageIndicator(
+                                controller: _pageController,
+                                count: images.length,
+                                effect: const ScrollingDotsEffect(
+                                  activeDotColor: Colors.black,
+                                  dotColor: Colors.grey,
+                                  dotHeight: 8,
+                                  dotWidth: 8,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      SelectableLinkify(
+                        text: data['content'] ?? '',
+                        onOpen: _onOpenLink,
+                        style: const TextStyle(fontSize: 16, height: 1.6),
+                        linkStyle: const TextStyle(color: Colors.blue),
+                      ),
+                      const Divider(height: 32),
+                      const Text('댓글', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      CommentList(
+                        boardId: widget.boardId,
+                        myNickName: myNickName,
+                        onReplyTargetChanged: _setReplyTarget,
+                        onEdit: (id, content) {},
+                      )
+                    ],
+                  );
+                },
+              ),
             ),
+          ),
+          CommentInputBar(
+            boardId: widget.boardId,
+            replyToId: _replyToId,
+            replyToNickname: _replyToNickname,
+            onCancelReply: _clearReplyTarget,
           ),
         ],
       ),

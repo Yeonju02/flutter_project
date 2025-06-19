@@ -32,6 +32,7 @@ class RoutineDetailPageState extends State<RoutineDetailPage> {
     String formattedDate = DateFormat('yyyy.MM.dd').format(selectedDate);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

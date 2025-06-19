@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:dropdown_button2/dropdown_button2.dart';
 
 class EditProductPage extends StatefulWidget {
   final DocumentSnapshot doc;
@@ -24,6 +25,7 @@ class _EditProductPageState extends State<EditProductPage> {
   bool isSoldOut = false;
 
   final Map<String, List<String>> categoryMap = {
+    '전체': [],
     '수면 용품': ['수면 안대', '숙면베개', '무드등'],
     '모닝 루틴': ['모닝 저널', '아로마오일'],
     '운동 용품': ['요가매트', '물병', '운동복'],
@@ -52,7 +54,6 @@ class _EditProductPageState extends State<EditProductPage> {
       final ref = FirebaseStorage.instance.ref().child('product_images/${picked.name}');
       await ref.putFile(file);
       final url = await ref.getDownloadURL();
-
       setState(() {
         colorOptions[index]['imgPath'] = url;
       });
@@ -62,18 +63,12 @@ class _EditProductPageState extends State<EditProductPage> {
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) return;
 
-    await FirebaseFirestore.instance
-        .collection('products')
-        .doc(widget.doc.id)
-        .update({
+    await FirebaseFirestore.instance.collection('products').doc(widget.doc.id).update({
       'productName': nameController.text,
       'productPrice': int.tryParse(priceController.text) ?? 0,
       'description': descController.text,
       'colors': colorOptions,
-      'productCategory': {
-        'main': selectedMainCategory,
-        'sub': selectedSubCategory,
-      },
+      'productCategory': {'main': selectedMainCategory, 'sub': selectedSubCategory},
       'isSoldOut': isSoldOut,
     });
 
@@ -83,6 +78,19 @@ class _EditProductPageState extends State<EditProductPage> {
   Future<void> _deleteProduct() async {
     await FirebaseFirestore.instance.collection('products').doc(widget.doc.id).delete();
     Navigator.pop(context);
+  }
+
+  InputDecoration _inputStyle(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: const Color(0xFFF0F4FA),
+      border: OutlineInputBorder(
+        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+    );
   }
 
   @override
@@ -100,32 +108,35 @@ class _EditProductPageState extends State<EditProductPage> {
           key: _formKey,
           child: ListView(
             children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: '상품명'),
-              ),
+              const Text('상품명', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              TextFormField(controller: nameController, decoration: _inputStyle('상품명')),
               const SizedBox(height: 12),
+              const Text('가격', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
               TextFormField(
                 controller: priceController,
-                decoration: const InputDecoration(labelText: '가격'),
+                decoration: _inputStyle('가격'),
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 12),
+              const Text('설명', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
               TextFormField(
                 controller: descController,
-                decoration: const InputDecoration(labelText: '설명'),
-                maxLines: 5, // ← 설명란 크기 넓힘
+                decoration: _inputStyle('설명'),
+                maxLines: 5,
               ),
               const SizedBox(height: 12),
-
-              // 🔵 메인 카테고리
-              DropdownButtonFormField<String>(
+              const Text('카테고리', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              DropdownButtonFormField2<String>(
+                isExpanded: true,
+                decoration: _inputStyle('메인 카테고리'),
                 value: selectedMainCategory,
+                hint: const Text('메인 카테고리'),
                 items: categoryMap.keys.map((main) {
-                  return DropdownMenuItem(
-                    value: main,
-                    child: Text(main),
-                  );
+                  return DropdownMenuItem(value: main, child: Text(main));
                 }).toList(),
                 onChanged: (val) {
                   setState(() {
@@ -133,41 +144,46 @@ class _EditProductPageState extends State<EditProductPage> {
                     selectedSubCategory = null;
                   });
                 },
-                decoration: const InputDecoration(labelText: '메인 카테고리'),
+                dropdownStyleData: DropdownStyleData(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F4FA),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
               ),
               const SizedBox(height: 12),
-
-              // 🔹 서브 카테고리
               if (selectedMainCategory != null)
-                DropdownButtonFormField<String>(
+                DropdownButtonFormField2<String>(
+                  isExpanded: true,
+                  decoration: _inputStyle('서브 카테고리'),
                   value: selectedSubCategory,
+                  hint: const Text('서브 카테고리'),
                   items: categoryMap[selectedMainCategory]!
                       .map((sub) => DropdownMenuItem(value: sub, child: Text(sub)))
                       .toList(),
-                  onChanged: (val) {
-                    setState(() {
-                      selectedSubCategory = val;
-                    });
-                  },
-                  decoration: const InputDecoration(labelText: '서브 카테고리'),
+                  onChanged: (val) => setState(() => selectedSubCategory = val),
+                  dropdownStyleData: DropdownStyleData(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F4FA),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                  ),
                 ),
               const SizedBox(height: 12),
-
-              // ❌ 품절 여부
               SwitchListTile(
                 title: const Text('품절 여부'),
                 value: isSoldOut,
-                onChanged: (val) {
-                  setState(() {
-                    isSoldOut = val;
-                  });
-                },
+                onChanged: (val) => setState(() => isSoldOut = val),
+                activeColor: const Color(0xFFA5C8F8),          // ON thumb
+                activeTrackColor: const Color(0xFFBBD6F5),     // ON track
+                inactiveThumbColor: const Color(0xFFA5C8F8),   // OFF thumb
+                inactiveTrackColor: const Color(0xFFEAF2FF),   // OFF track (연한 파랑)
               ),
-
               const SizedBox(height: 20),
-              const Text('색상 및 재고'),
+              const Text('색상 및 재고', style: TextStyle(fontWeight: FontWeight.bold),),
               const SizedBox(height: 10),
-
               ...colorOptions.asMap().entries.map((entry) {
                 final i = entry.key;
                 final color = entry.value;
@@ -201,11 +217,11 @@ class _EditProductPageState extends State<EditProductPage> {
                   ),
                 );
               }),
-
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _saveProduct,
-                child: const Text('저장하기'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFA5C8F8)),
+                child: const Text('저장하기', style: TextStyle(color: Colors.white),),
               ),
               TextButton(
                 onPressed: _deleteProduct,

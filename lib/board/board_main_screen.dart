@@ -3,16 +3,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:routinelogapp/admin/admin_board_page.dart';
+import 'package:routinelogapp/board/board_comment_screen.dart';
+import 'package:routinelogapp/board/board_detail_screen.dart';
 import 'package:routinelogapp/board/board_write_screen.dart';
 import 'package:routinelogapp/custom/bottom_nav_bar.dart';
 import 'package:routinelogapp/main/main_page.dart';
 import 'package:routinelogapp/mypage/myPage_main.dart';
 import 'package:routinelogapp/notification/notification_screen.dart';
 import 'package:routinelogapp/shop/shop_main.dart';
-import 'package:routinelogapp/board/board_detail_screen.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dropdown_button2/dropdown_button2.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 class BoardMainScreen extends StatefulWidget {
   const BoardMainScreen({super.key});
@@ -250,12 +252,25 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
     final reason = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
+        backgroundColor: Colors.white,
         title: const Text('신고 사유를 선택해주세요'),
         children: [
-          SimpleDialogOption(child: const Text('욕설 / 비방'), onPressed: () => Navigator.pop(context, '욕설 / 비방')),
-          SimpleDialogOption(child: const Text('광고 / 도배'), onPressed: () => Navigator.pop(context, '광고 / 도배')),
-          SimpleDialogOption(child: const Text('부적절한 콘텐츠'), onPressed: () => Navigator.pop(context, '부적절한 콘텐츠')),
-          SimpleDialogOption(child: const Text('기타'), onPressed: () => Navigator.pop(context, '기타')),
+          SimpleDialogOption(
+            child: const Text('욕설 / 비방'),
+            onPressed: () => Navigator.pop(context, '욕설 / 비방'),
+          ),
+          SimpleDialogOption(
+            child: const Text('광고 / 도배'),
+            onPressed: () => Navigator.pop(context, '광고 / 도배'),
+          ),
+          SimpleDialogOption(
+            child: const Text('부적절한 콘텐츠'),
+            onPressed: () => Navigator.pop(context, '부적절한 콘텐츠'),
+          ),
+          SimpleDialogOption(
+            child: const Text('기타'),
+            onPressed: () => Navigator.pop(context, '기타'),
+          ),
         ],
       ),
     );
@@ -336,9 +351,9 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
           return FutureBuilder<DocumentSnapshot>(
             future: FirebaseFirestore.instance.collection('users').doc(post['userId']).get(),
             builder: (context, userSnapshot) {
-              final level = userSnapshot.hasData
-                  ? 'LV.${userSnapshot.data!.get('level').toString()}'
-                  : 'LV.?';
+              final userData = userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+              final level = userData['level'] != null ? 'LV.${userData['level']}' : 'LV.?';
+              final String? profileImg = userData['imgPath'];
 
               return Card(
                 color: const Color(0xFFE7F3FF),
@@ -357,8 +372,15 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                           children: [
                             Row(
                               children: [
-                                const CircleAvatar(
-                                  backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: const Color(0xFFE0E0E0),
+                                  backgroundImage: (profileImg != null && profileImg.isNotEmpty)
+                                      ? NetworkImage(profileImg)
+                                      : null,
+                                  child: (profileImg == null || profileImg.isEmpty)
+                                      ? const Icon(Icons.person, size: 24, color: Colors.grey)
+                                      : null,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(post['nickName'] ?? '익명', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -370,7 +392,7 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                               children: [
                                 if (userId != post['userId'])
                                   IconButton(
-                                    icon: const Icon(Icons.report_outlined),
+                                    icon: const Icon(LucideIcons.alertTriangle, size: 26, color: Colors.blueGrey),
                                     onPressed: () => _reportBoard(post['boardId']),
                                   ),
                                 if (userId == post['userId'])
@@ -488,16 +510,16 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                     return Column(
                                       children: [
                                         IconButton(
-                                          icon: Icon(
-                                            isLiked ? Icons.favorite : Icons.favorite_border,
-                                            color: isLiked ? const Color(0xFFF45050) : Colors.grey,
-                                          ),
+                                            icon: Icon(
+                                              isLiked ? Icons.favorite : Icons.favorite_border,
+                                              color: isLiked ? const Color(0xFFF45050) : Colors.grey,
+                                            ),
                                             onPressed: () async {
                                               if (isLiked) {
                                                 // 좋아요 취소
                                                 await likeDoc.delete();
                                                 await boardDoc.update({'likeCount': FieldValue.increment(-1)});
-                                              } else {
+                                              } else { // 나중에 여기에 좋아요 누르기 미션 수행 카운트 늘리기
                                                 // 좋아요 추가
                                                 await likeDoc.set({'likedAt': FieldValue.serverTimestamp()});
                                                 await boardDoc.update({'likeCount': FieldValue.increment(1)});
