@@ -1653,7 +1653,7 @@ class _MyPageMainState extends State<MyPageMain> {
                           'userId': user.uid,
                           'score': selectedScore,
                           'contents': reviewController.text,
-                          'createAt': Timestamp.now(),
+                          'createdAt': Timestamp.now(),
                         };
 
                         await FirebaseFirestore.instance

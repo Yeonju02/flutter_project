@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:routinelogapp/shop/roulette_page.dart';
 import '../board/board_main_screen.dart';
 import '../main/main_page.dart';
 import '../mypage/myPage_main.dart';
@@ -28,8 +29,8 @@ class _ShopMainPageState extends State<ShopMainPage> {
   final Map<String, List<String>> categoryMap = {
     '전체': [],
     '수면 용품': ['수면 안대', '숙면베개', '무드등'],
-    '모닝 루틴': ['모닝 저널', '아로마오일'],
-    '운동 용품': ['요가매트', '물병', '운동복'],
+    '생활 용품': ['다이어리', '디퓨저', '마스크팩'],
+    '운동 용품': ['운동기구', '물병', '운동복'],
   };
 
   String? userId;
@@ -66,6 +67,12 @@ class _ShopMainPageState extends State<ShopMainPage> {
         children: [
           Column(
             children: [
+              TextButton(
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => AnimatedRoulettePage(),));
+                  }, 
+                  child: Text("룰렛")
+              ),
               // 검색창
               Padding(
                 padding: const EdgeInsets.all(10),
@@ -208,8 +215,10 @@ class _ShopMainPageState extends State<ShopMainPage> {
                       return matchesMain && matchesSub && matchesSearch;
                     }).map((doc) {
                       final data = doc.data() as Map<String, dynamic>;
-                      data['productId'] = doc.id;
-                      return data; // 🔄 data만 리스트에 담음
+                      return {
+                        ...data,
+                        'productId': doc.id,
+                      };
                     }).toList();
 
                     // ✅ 최초 한 번만 표시하거나 로딩이 끝난 후 교체

@@ -27,8 +27,8 @@ class _EditProductPageState extends State<EditProductPage> {
   final Map<String, List<String>> categoryMap = {
     '전체': [],
     '수면 용품': ['수면 안대', '숙면베개', '무드등'],
-    '모닝 루틴': ['모닝 저널', '아로마오일'],
-    '운동 용품': ['요가매트', '물병', '운동복'],
+    '생활 용품': ['다이어리', '디퓨저', '마스크팩'],
+    '운동 용품': ['운동기구', '물병', '운동복'],
   };
 
   @override
