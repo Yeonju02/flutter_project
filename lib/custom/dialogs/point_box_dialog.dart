@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_shake_animated/flutter_shake_animated.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'point_roulette.dart';
+import 'choice_dialog.dart'; // 추가
 
 class PointBoxDialog extends StatefulWidget {
   final String userDocId;
@@ -56,6 +57,7 @@ class _PointBoxDialogState extends State<PointBoxDialog> with TickerProviderStat
   void _onTap() async {
     if (isShaking) return;
 
+    if (!mounted) return;
     setState(() {
       isShaking = true;
       showSmoke = false;
@@ -65,6 +67,7 @@ class _PointBoxDialogState extends State<PointBoxDialog> with TickerProviderStat
 
     await Future.delayed(const Duration(seconds: 2));
 
+    if (!mounted) return;
     setState(() {
       isShaking = false;
       showSmoke = true;
@@ -74,6 +77,7 @@ class _PointBoxDialogState extends State<PointBoxDialog> with TickerProviderStat
 
     await Future.delayed(const Duration(seconds: 1));
 
+    if (!mounted) return;
     setState(() {
       showSmoke = false;
       isUsed = true;
@@ -84,6 +88,7 @@ class _PointBoxDialogState extends State<PointBoxDialog> with TickerProviderStat
 
     await Future.delayed(const Duration(milliseconds: 50));
 
+    if (!mounted) return;
     setState(() {
       usedOpacity = 1.0;
     });
@@ -91,10 +96,8 @@ class _PointBoxDialogState extends State<PointBoxDialog> with TickerProviderStat
 
   Future<void> _addFixedPoint(int value) async {
     final docRef = FirebaseFirestore.instance.collection('users').doc(widget.userDocId);
-
     final snapshot = await docRef.get();
     final currentPoint = (snapshot.data()?['point'] ?? 0) as int;
-
     await docRef.update({'point': currentPoint + value});
   }
 
@@ -127,42 +130,32 @@ class _PointBoxDialogState extends State<PointBoxDialog> with TickerProviderStat
                   child: Image.asset('assets/used_point_box.png', width: 160, height: 160),
                 ),
 
-              if (showSmoke)
+              if (showSmoke && _scaleAnimation != null)
                 ScaleTransition(
                   scale: _scaleAnimation!,
                   child: Image.asset('assets/smoke.png', width: 350, height: 350),
                 ),
 
-              if (showPointText)
+              if (showPointText && _textScaleAnimation != null)
                 GestureDetector(
                   onTap: () async {
-                    final shouldSpin = await showDialog<bool>(
+                    final shouldSpin = await showChoiceDialog(
                       context: context,
-                      barrierDismissible: false,
-                      builder: (_) => AlertDialog(
-                        title: const Text('룰렛 도전'),
-                        content: const Text('룰렛을 돌려 추가 포인트에 도전할까요?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text('아니오'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.of(context).pop(true),
-                            child: const Text('예'),
-                          ),
-                        ],
-                      ),
+                      title: '룰렛 도전',
+                      content: '룰렛을 돌려 추가 포인트에 도전할까요?',
                     );
+
+                    if (!mounted) return;
 
                     if (shouldSpin == true) {
                       showDialog(
                         context: context,
-                        builder: (_) => const PointRouletteDialog(),
+                        builder: (_) => PointRouletteDialog(userDocId: widget.userDocId),
                       );
+
                     } else {
                       await _addFixedPoint(100);
-                      Navigator.of(context).pop(); // 포인트 상자 다이얼로그 닫기
+                      if (mounted) Navigator.of(context).pop();
                     }
                   },
                   child: ScaleTransition(
@@ -174,7 +167,7 @@ class _PointBoxDialogState extends State<PointBoxDialog> with TickerProviderStat
                         fontWeight: FontWeight.bold,
                         color: Colors.orange[700],
                         shadows: [
-                          Shadow(offset: Offset(1, 1), blurRadius: 2.0, color: Colors.black26),
+                          const Shadow(offset: Offset(1, 1), blurRadius: 2.0, color: Colors.black26),
                         ],
                       ),
                     ),

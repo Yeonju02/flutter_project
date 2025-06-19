@@ -66,6 +66,7 @@ class _MainPageState extends State<MainPage> with RouteAware {
               padding: const EdgeInsets.only(bottom: 90),
               child: Column(
                 children: [
+
                   const SizedBox(height: 20),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

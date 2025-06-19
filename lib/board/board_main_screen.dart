@@ -519,7 +519,7 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                                 // 좋아요 취소
                                                 await likeDoc.delete();
                                                 await boardDoc.update({'likeCount': FieldValue.increment(-1)});
-                                              } else {
+                                              } else { // 나중에 여기에 좋아요 누르기 미션 수행 카운트 늘리기
                                                 // 좋아요 추가
                                                 await likeDoc.set({'likedAt': FieldValue.serverTimestamp()});
                                                 await boardDoc.update({'likeCount': FieldValue.increment(1)});

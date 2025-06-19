@@ -103,6 +103,7 @@ flutter:
     - assets/point_box.png
     - assets/used_point_box.png
     - assets/smoke.png
+    - assets/mission_target.png
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

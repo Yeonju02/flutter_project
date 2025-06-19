@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../effect/xp_night_animation.dart';
+import '../dialogs/point_box_dialog.dart'; // 추가
 
 class XpNightDialog extends StatefulWidget {
   final int currentLevel;
@@ -30,6 +31,7 @@ class _XpNightDialogState extends State<XpNightDialog> with TickerProviderStateM
 
   List<int> xpStages = [];
   int currentStage = 0;
+  bool didLevelUp = false; // 추가
 
   @override
   void initState() {
@@ -42,7 +44,7 @@ class _XpNightDialogState extends State<XpNightDialog> with TickerProviderStateM
     if (currentXP + remainingXP <= 100) {
       xpStages.add(currentXP + remainingXP);
     } else {
-      xpStages.add(100); // 기본 바 꽉 채우고 남은부분 채우기
+      xpStages.add(100);
       remainingXP -= (100 - currentXP);
       while (remainingXP >= 100) {
         xpStages.add(100);
@@ -56,9 +58,7 @@ class _XpNightDialogState extends State<XpNightDialog> with TickerProviderStateM
       duration: const Duration(milliseconds: 800),
     );
 
-
     _startNextAnimation(from: currentXP.toDouble());
-
 
     Future.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
@@ -90,21 +90,28 @@ class _XpNightDialogState extends State<XpNightDialog> with TickerProviderStateM
           if (xpInBar == 100) {
             displayLevel += 1;
             xpInBar = 0;
+            didLevelUp = true; // 추가
           }
 
           currentStage += 1;
 
-
           if (currentStage < xpStages.length) {
             _startNextAnimation(from: 0);
           } else {
-            // 결과 저장
-            print("저장 시도: level=$displayLevel, xp=$xpInBar, docId=${widget.userDocId}");
             FirebaseFirestore.instance.collection('users').doc(widget.userDocId).update({
               'xp': xpInBar,
               'level': displayLevel,
             }).then((_) {
-              print("저장 완료");
+              if (didLevelUp && mounted) {
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  if (!mounted) return;
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => PointBoxDialog(userDocId: widget.userDocId),
+                  );
+                });
+              }
             }).catchError((e) {
               print("저장 실패: $e");
             });
@@ -125,7 +132,7 @@ class _XpNightDialogState extends State<XpNightDialog> with TickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: Color(0xFF3D4166),
+      backgroundColor: const Color(0xFF3D4166),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
@@ -144,15 +151,15 @@ class _XpNightDialogState extends State<XpNightDialog> with TickerProviderStateM
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("Lv. $displayLevel", style: const TextStyle(color: Colors.black87)),
+                        Text("Lv. $displayLevel", style: const TextStyle(color: Colors.white)),
                         Text("$currentAnimatedXP / 100 XP",
-                            style: const TextStyle(color: Colors.black87)),
+                            style: const TextStyle(color: Colors.white)),
                       ],
                     ),
                     const SizedBox(height: 8),
                     LinearProgressIndicator(
                       value: _progressAnimation.value.clamp(0.0, 1.0),
-                      backgroundColor: Colors.grey.shade300,
+                      backgroundColor: Colors.white24,
                       color: Colors.lightBlue,
                       minHeight: 12,
                     ),
@@ -166,7 +173,11 @@ class _XpNightDialogState extends State<XpNightDialog> with TickerProviderStateM
               opacity: showXPText ? 1.0 : 0.0,
               child: Text(
                 "경험치 ${widget.earnedXP}XP 획득!",
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
             const SizedBox(height: 24),

@@ -1,11 +1,14 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:roulette/roulette.dart';
 
 import 'guide_dialog.dart';
 
 class PointRouletteDialog extends StatefulWidget {
-  const PointRouletteDialog({super.key});
+  final String userDocId; // 추가
+
+  const PointRouletteDialog({super.key, required this.userDocId}); // 수정
 
   @override
   State<PointRouletteDialog> createState() => _PointRouletteDialogState();
@@ -34,7 +37,7 @@ class _PointRouletteDialogState extends State<PointRouletteDialog> {
     if (isRolling) return;
     setState(() => isRolling = true);
 
-    final index = _getWeightedResultIndex(); // 확률 기반 결과 인덱스
+    final index = _getWeightedResultIndex();
     final offset = _random.nextDouble();
 
     final result = await _controller.rollTo(index, offset: offset);
@@ -60,9 +63,17 @@ class _PointRouletteDialogState extends State<PointRouletteDialog> {
     return group.units.length - 1;
   }
 
+  Future<void> _addPoint(int value) async {
+    final docRef = FirebaseFirestore.instance.collection('users').doc(widget.userDocId);
+    final snapshot = await docRef.get();
+    final currentPoint = (snapshot.data()?['point'] ?? 0) as int;
+    await docRef.update({'point': currentPoint + value});
+  }
+
   void _showResultDialog(String resultText) {
     String title = '';
     String message = '';
+    int earnedPoint = 0;
 
     switch (resultText) {
       case 'x0':
@@ -71,15 +82,18 @@ class _PointRouletteDialogState extends State<PointRouletteDialog> {
         break;
       case 'x1':
         title = '본전';
-        message = '그래도 본전! 나쁘지 않네요!';
+        message = '그래도 본전! 100 포인트를 획득했습니다!';
+        earnedPoint = 100;
         break;
       case 'x2':
         title = '축하합니다!';
         message = '200 포인트를 획득했습니다!';
+        earnedPoint = 200;
         break;
       case 'x3':
         title = '축하합니다!';
         message = '300 포인트를 획득했습니다!';
+        earnedPoint = 300;
         break;
       default:
         title = '결과';
@@ -91,7 +105,10 @@ class _PointRouletteDialogState extends State<PointRouletteDialog> {
       builder: (context) => GuideDialog(
         title: title,
         description: message,
-        onConfirm: () {
+        onConfirm: () async {
+          if (earnedPoint > 0) {
+            await _addPoint(earnedPoint);
+          }
           Navigator.of(context).pop(); // GuideDialog
           Navigator.of(context).pop(); // PointRouletteDialog
           Navigator.of(context).pop(); // PointBoxDialog
