@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:routinelogapp/admin/admin_product_add.dart';
 import '../main/main_page.dart';
 import '../custom/admin_bottom_bar.dart';
+import 'admin_board_page.dart';
+import 'admin_dashboard_page.dart';
 import 'admin_product_edit.dart';
 import 'admin_user_page.dart';
 
@@ -22,9 +24,9 @@ class _AdminProductPageState extends State<AdminProductPage> {
 
   final Map<String, List<String>> categoryMap = {
     '전체': [],
-    '모닝 루틴': ['모닝 저널', '아로마오일'],
     '수면 용품': ['수면 안대', '숙면베개', '무드등'],
-    '운동 용품': ['요가매트', '물병', '운동복'],
+    '생활 용품': ['다이어리', '디퓨저', '마스크팩'],
+    '운동 용품': ['운동기구', '물병', '운동복'],
   };
 
   @override
@@ -266,13 +268,18 @@ class _AdminProductPageState extends State<AdminProductPage> {
         ),
       ),
       bottomNavigationBar: AdminBottomNavBar(
-          currentIndex: 3,
+        currentIndex: 3, // 현재 탭: 회원
         onTap: (index) {
-          if (index == 0) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const UserAdminPage()),
-            );
+          switch (index) {
+            case 0:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => UserAdminPage()));
+              break;
+            case 1:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AdminDashboardPage()));
+              break;
+            case 2:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AdminBoardPage()));
+              break;
           }
         },
       ),
