@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../effect/xp_animation.dart';
+import '../dialogs/point_box_dialog.dart';
 
 class XpDialog extends StatefulWidget {
   final int currentLevel;
@@ -30,6 +31,7 @@ class _XpDialogState extends State<XpDialog> with TickerProviderStateMixin {
 
   List<int> xpStages = [];
   int currentStage = 0;
+  bool didLevelUp = false;
 
   @override
   void initState() {
@@ -42,7 +44,7 @@ class _XpDialogState extends State<XpDialog> with TickerProviderStateMixin {
     if (currentXP + remainingXP <= 100) {
       xpStages.add(currentXP + remainingXP);
     } else {
-      xpStages.add(100); // 기본 바 꽉 채우고 남은부분 채우기
+      xpStages.add(100);
       remainingXP -= (100 - currentXP);
       while (remainingXP >= 100) {
         xpStages.add(100);
@@ -56,11 +58,10 @@ class _XpDialogState extends State<XpDialog> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 800),
     );
 
-    // 첫 애니메이션 시작
     _startNextAnimation(from: currentXP.toDouble());
 
-    // 텍스트 표시 지연
     Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
       setState(() {
         showXPText = true;
       });
@@ -81,6 +82,7 @@ class _XpDialogState extends State<XpDialog> with TickerProviderStateMixin {
     ))
       ..addStatusListener((status) {
         if (status == AnimationStatus.completed) {
+          if (!mounted) return;
           setState(() {
             xpInBar = xpStages[currentStage];
           });
@@ -88,21 +90,28 @@ class _XpDialogState extends State<XpDialog> with TickerProviderStateMixin {
           if (xpInBar == 100) {
             displayLevel += 1;
             xpInBar = 0;
+            didLevelUp = true;
           }
 
           currentStage += 1;
 
-
           if (currentStage < xpStages.length) {
             _startNextAnimation(from: 0);
           } else {
-            // 결과 저장
-            print("저장 시도: level=$displayLevel, xp=$xpInBar, docId=${widget.userDocId}");
             FirebaseFirestore.instance.collection('users').doc(widget.userDocId).update({
               'xp': xpInBar,
               'level': displayLevel,
             }).then((_) {
-              print("저장 완료");
+              if (didLevelUp && mounted) {
+                Future.delayed(const Duration(milliseconds: 300), () {
+                  if (!mounted) return;
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => PointBoxDialog(userDocId: widget.userDocId),
+                  );
+                });
+              }
             }).catchError((e) {
               print("저장 실패: $e");
             });

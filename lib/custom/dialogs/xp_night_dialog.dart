@@ -61,6 +61,7 @@ class _XpNightDialogState extends State<XpNightDialog> with TickerProviderStateM
 
 
     Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
       setState(() {
         showXPText = true;
       });
@@ -81,6 +82,7 @@ class _XpNightDialogState extends State<XpNightDialog> with TickerProviderStateM
     ))
       ..addStatusListener((status) {
         if (status == AnimationStatus.completed) {
+          if (!mounted) return;
           setState(() {
             xpInBar = xpStages[currentStage];
           });

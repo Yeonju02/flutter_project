@@ -56,7 +56,7 @@ dependencies:
   dropdown_button2: ^2.3.9
   lucide_icons: ^0.257.0
   flutter_shake_animated:
-
+  roulette:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
 
@@ -102,6 +102,7 @@ flutter:
     - assets/sleep_cycle_graph.png
     - assets/point_box.png
     - assets/used_point_box.png
+    - assets/smoke.png
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
