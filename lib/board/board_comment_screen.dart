@@ -74,6 +74,7 @@ class _CommentScreenState extends State<CommentScreen> {
           ),
         ),
         CommentInputBar(
+          key: ValueKey('${_replyToId ?? ''}_${_editTargetId ?? ''}'),
           boardId: widget.boardId,
           replyToId: _replyToId,
           replyToNickname: _replyToNickname,
