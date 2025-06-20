@@ -9,8 +9,9 @@ import 'package:uuid/uuid.dart';
 
 class BoardWriteScreen extends StatefulWidget {
   final Map<String, dynamic>? post;
+  final String? boardId;
 
-  const BoardWriteScreen({super.key, this.post});
+  const BoardWriteScreen({super.key, this.post, this.boardId});
 
   @override
   State<BoardWriteScreen> createState() => _BoardWriteScreenState();
@@ -21,10 +22,11 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
   final TextEditingController _contentController = TextEditingController();
   String? _selectedCategory;
   List<XFile> _images = [];
+  List<Map<String, dynamic>> _existingImages = [];
   bool _isUploading = false;
 
   final List<String> baseCategories = ['아침 루틴 후기/공유', '수면 관리 후기/공유', '제품/영상 추천'];
-  bool? _isAdmin; // null = 로딩 중
+  bool? _isAdmin;
 
   bool get isEditMode => widget.post != null;
 
@@ -42,8 +44,9 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
       _titleController.text = widget.post!['title'] ?? '';
       _contentController.text = widget.post!['content'] ?? '';
       _selectedCategory = widget.post!['boardCategory'];
+      _loadExistingImages();
     } else {
-      _selectedCategory = '아침 루틴 후기/공유';
+      _selectedCategory = '가치 루티드 후기/공유';
     }
   }
 
@@ -58,8 +61,26 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
       _isAdmin = status == 'A';
 
       if (_isAdmin != true && _selectedCategory == '공지사항') {
-        _selectedCategory = '아침 루틴 후기/공유';
+        _selectedCategory = '가치 루티드 후기/공유';
       }
+    });
+  }
+
+  Future<void> _loadExistingImages() async {
+    final boardId = widget.boardId ?? widget.post!['boardId'];
+    final filesSnapshot = await FirebaseFirestore.instance
+        .collection('boards')
+        .doc(boardId)
+        .collection('boardFiles')
+        .get();
+
+    setState(() {
+      _existingImages = filesSnapshot.docs.map((doc) => {
+        'filePath': doc['filePath'],
+        'fileName': doc['fileName'],
+        'isThumbNail': doc['isThumbNail'],
+        'docId': doc.id,
+      }).toList();
     });
   }
 
@@ -71,6 +92,19 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
         _images = picked;
       });
     }
+  }
+
+  Future<void> _deleteExistingImage(String boardId, String docId) async {
+    await FirebaseFirestore.instance
+        .collection('boards')
+        .doc(boardId)
+        .collection('boardFiles')
+        .doc(docId)
+        .delete();
+
+    setState(() {
+      _existingImages.removeWhere((img) => img['docId'] == docId);
+    });
   }
 
   Future<List<Map<String, dynamic>>> _uploadImagesToStorage(String boardId) async {
@@ -94,12 +128,8 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
   }
 
   Future<void> _submitBoard() async {
-    if (_titleController.text.isEmpty ||
-        _contentController.text.isEmpty ||
-        _selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('모든 필드를 입력하세요')),
-      );
+    if (_titleController.text.isEmpty || _contentController.text.isEmpty || _selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('모든 필드를 입력하세요')));
       return;
     }
 
@@ -122,6 +152,17 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
           'updatedAt': now,
           if (_selectedCategory == '공지사항') 'status': 'A',
         });
+
+        if (_images.isNotEmpty) {
+          final imageInfoList = await _uploadImagesToStorage(boardId);
+          for (var imageData in imageInfoList) {
+            await FirebaseFirestore.instance
+                .collection('boards')
+                .doc(boardId)
+                .collection('boardFiles')
+                .add(imageData);
+          }
+        }
       } else {
         final boardId = const Uuid().v4();
         await FirebaseFirestore.instance.collection('boards').doc(boardId).set({
@@ -156,9 +197,7 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
       }
     } catch (e) {
       print('에러 발생: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류 발생: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('오류 발생: $e')));
     } finally {
       setState(() => _isUploading = false);
     }
@@ -183,7 +222,6 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
               controller: _titleController,
               decoration: const InputDecoration(
                 labelText: '제목',
-                labelStyle: TextStyle(color: Colors.black),
                 border: OutlineInputBorder(),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF92BBE2), width: 2),
@@ -212,7 +250,7 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
                 ),
               ),
               dropdownStyleData: DropdownStyleData(
-                maxHeight: _isAdmin == true ? 300 : 160, // 관리자면 높이 늘림
+                maxHeight: _isAdmin == true ? 300 : 160,
                 width: MediaQuery.of(context).size.width - 64,
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -231,7 +269,6 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
               maxLines: 8,
               decoration: const InputDecoration(
                 labelText: '내용',
-                labelStyle: TextStyle(color: Colors.black),
                 border: OutlineInputBorder(),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(color: Color(0xFF92BBE2), width: 2),
@@ -242,14 +279,26 @@ class _BoardWriteScreenState extends State<BoardWriteScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _images.map((file) {
-                return Image.file(
-                  File(file.path),
-                  width: 100,
-                  height: 100,
-                  fit: BoxFit.cover,
-                );
-              }).toList(),
+              children: [
+                ..._existingImages.map((img) => Stack(
+                  children: [
+                    Image.network(img['filePath'], width: 100, height: 100, fit: BoxFit.cover),
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: () => _deleteExistingImage(widget.boardId ?? widget.post!['boardId'], img['docId']),
+                        child: const CircleAvatar(
+                          radius: 12,
+                          backgroundColor: Colors.black54,
+                          child: Icon(Icons.close, color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                )),
+                ..._images.map((file) => Image.file(File(file.path), width: 100, height: 100, fit: BoxFit.cover)).toList(),
+              ],
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(

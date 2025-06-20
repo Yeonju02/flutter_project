@@ -394,299 +394,329 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
       child: StatefulBuilder(
         builder: (context, setState) {
           return FutureBuilder<DocumentSnapshot>(
-            future: FirebaseFirestore.instance.collection('users').doc(post['userId']).get(),
-            builder: (context, userSnapshot) {
-              final userData = userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
-              final level = userData['level'] != null ? 'LV.${userData['level']}' : 'LV.?';
-              final String? profileImg = userData['imgPath'];
-              final isAdmin = userData['status'] == 'A';
+            future: FirebaseFirestore.instance.collection('users').doc(userId).get(),
+            builder: (context, currentUserSnapshot) {
+              final currentUserData = currentUserSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+              final isCurrentUserAdmin = currentUserData['status'] == 'A';
 
+              return FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance.collection('users').doc(post['userId']).get(),
+                builder: (context, userSnapshot) {
+                  final userData = userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+                  final level = userData['level'] != null ? 'LV.${userData['level']}' : 'LV.?';
+                  final String? profileImg = userData['imgPath'];
+                  final isPostWriterAdmin = userData['status'] == 'A';
 
-              return Card(
-                color: const Color(0xFFE7F3FF),
-                elevation: 0,
-                margin: const EdgeInsets.all(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 프로필 헤더
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
+                  return Card(
+                    color: const Color(0xFFE7F3FF),
+                    elevation: 0,
+                    margin: const EdgeInsets.all(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 프로필 헤더
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: const Color(0xFFE0E0E0),
-                                  backgroundImage: (profileImg != null && profileImg.isNotEmpty)
-                                      ? NetworkImage(profileImg)
-                                      : null,
-                                  child: (profileImg == null || profileImg.isEmpty)
-                                      ? const Icon(Icons.person, size: 24, color: Colors.grey)
-                                      : null,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(post['nickName'] ?? '익명', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                const SizedBox(width: 8),
-                                isAdmin && isNotice
-                                    ? Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blueGrey,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text(
-                                    '공지사항',
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                                  ),
-                                )
-                                    : Text(level, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                              ],
-                            ),
-                            Row(
-                              children: [
-                                if (userId != post['userId'])
-                                  IconButton(
-                                    icon: const Icon(LucideIcons.alertTriangle, size: 26, color: Colors.blueGrey),
-                                    onPressed: () => _reportBoard(post['boardId']),
-                                  ),
-                                if (userId == post['userId'])
-                                  PopupMenuButton<String>(
-                                    padding: EdgeInsets.zero,
-                                    color: const Color(0xFF92BBE2),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 20,
+                                      backgroundColor: const Color(0xFFE0E0E0),
+                                      backgroundImage: (profileImg != null && profileImg.isNotEmpty)
+                                          ? NetworkImage(profileImg)
+                                          : null,
+                                      child: (profileImg == null || profileImg.isEmpty)
+                                          ? const Icon(Icons.person, size: 24, color: Colors.grey)
+                                          : null,
                                     ),
-                                    onSelected: (value) => _handlePostMenuSelection(value, post), // 🔁 여기에 함수 연결
-                                    itemBuilder: (context) => [
-                                      const PopupMenuItem(
-                                        value: 'edit',
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(horizontal: 4),
-                                          child: Text('수정', style: TextStyle(color: Colors.white)),
-                                        ),
+                                    const SizedBox(width: 8),
+                                    Text(post['nickName'] ?? '익명',
+                                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 8),
+                                    isPostWriterAdmin && isNotice
+                                        ? Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blueGrey,
+                                        borderRadius: BorderRadius.circular(6),
                                       ),
-                                      const PopupMenuItem(
-                                        value: 'delete',
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(horizontal: 4),
-                                          child: Text('삭제', style: TextStyle(color: Colors.white)),
-                                        ),
+                                      child: const Text(
+                                        '공지사항',
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12),
                                       ),
-                                    ],
-                                    icon: const Icon(Icons.more_vert),
-                                  )
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // 이미지 슬라이드
-                      StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('boards')
-                            .doc(post['boardId'])
-                            .collection('boardFiles')
-                            .orderBy('isThumbNail', descending: true)
-                            .snapshots(),
-                        builder: (context, snap) {
-                          if (snap.hasData && snap.data!.docs.isNotEmpty) {
-                            final images = snap.data!.docs.map((e) => e['filePath'] as String).toList();
-                            return Column(
-                              children: [
-                                SizedBox(
-                                  height: 250,
-                                  child: PageView.builder(
-                                    controller: _pageController,
-                                    itemCount: images.length,
-                                    itemBuilder: (context, index) {
-                                      return Image.network(images[index], fit: BoxFit.cover, width: double.infinity);
-                                    },
-                                  ),
+                                    )
+                                        : Text(level, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                  ],
                                 ),
-                                const SizedBox(height: 8),
-                                SmoothPageIndicator(
-                                  controller: _pageController,
-                                  count: images.length,
-                                  effect: const ScrollingDotsEffect(
-                                    activeDotColor: Colors.black,
-                                    dotColor: Colors.grey,
-                                    dotHeight: 8,
-                                    dotWidth: 8,
-                                  ),
-                                ),
-                              ],
-                            );
-                          } else {
-                            return const SizedBox.shrink();
-                          }
-                        },
-                      ),
-
-                      // 텍스트 본문
-                      Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 좋아요
-                            StreamBuilder<DocumentSnapshot>(
-                              stream: boardDoc.snapshots(),
-                              builder: (context, boardSnapshot) {
-                                final boardData = boardSnapshot.data?.data() as Map<String, dynamic>? ?? {};
-                                final likeCount = boardData['likeCount'] ?? 0;
-
-                                return StreamBuilder<DocumentSnapshot>(
-                                  stream: likeDoc.snapshots(),
-                                  builder: (context, snapshot) {
-                                    final isLiked = snapshot.data?.exists ?? false;
-
-                                    return Column(
-                                      children: [
-                                        IconButton(
-                                            icon: Icon(
-                                              isLiked ? Icons.favorite : Icons.favorite_border,
-                                              color: isLiked ? const Color(0xFFF45050) : Colors.grey,
+                                Row(
+                                  children: [
+                                    if (userId != post['userId'])
+                                      IconButton(
+                                        icon: const Icon(LucideIcons.alertTriangle,
+                                            size: 26, color: Colors.blueGrey),
+                                        onPressed: () => _reportBoard(post['boardId']),
+                                      ),
+                                    if (userId == post['userId'] || isCurrentUserAdmin)
+                                      PopupMenuButton<String>(
+                                        padding: EdgeInsets.zero,
+                                        color: const Color(0xFF92BBE2),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        onSelected: (value) => _handlePostMenuSelection(value, post),
+                                        itemBuilder: (context) => [
+                                          const PopupMenuItem(
+                                            value: 'edit',
+                                            child: Padding(
+                                              padding: EdgeInsets.symmetric(horizontal: 4),
+                                              child: Text('수정',
+                                                  style: TextStyle(color: Colors.white)),
                                             ),
-                                            onPressed: () async {
-                                              if (isLiked) {
-                                                // 좋아요 취소
-                                                await likeDoc.delete();
-                                                await boardDoc.update({'likeCount': FieldValue.increment(-1)});
-                                              } else {
-                                                // 좋아요 추가
-                                                await likeDoc.set({'likedAt': FieldValue.serverTimestamp()});
-                                                await boardDoc.update({'likeCount': FieldValue.increment(1)});
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'delete',
+                                            child: Padding(
+                                              padding: EdgeInsets.symmetric(horizontal: 4),
+                                              child: Text('삭제',
+                                                  style: TextStyle(color: Colors.white)),
+                                            ),
+                                          ),
+                                        ],
+                                        icon: const Icon(Icons.more_vert),
+                                      )
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
 
-                                                // 알림 보내기 전에 알림 설정 확인
-                                                final receiverUid = post['userId'];
-                                                final currentUser = FirebaseAuth.instance.currentUser;
-                                                if (currentUser != null && receiverUid != currentUser.uid) {
-                                                  final notiSettingSnap = await FirebaseFirestore.instance
-                                                      .collection('users')
-                                                      .doc(receiverUid)
-                                                      .collection('notiSettings')
-                                                      .doc('main')
-                                                      .get();
-
-                                                  final notiSettings = notiSettingSnap.data();
-                                                  final isLikeEnabled = notiSettings?['like'] ?? false;
-
-                                                  if (isLikeEnabled) {
-                                                    // Firestore에서 내 닉네임 불러오기
-                                                    final userDoc = await FirebaseFirestore.instance
-                                                        .collection('users')
-                                                        .doc(currentUser.uid)
-                                                        .get();
-
-                                                    final nickName = userDoc.data()?['nickName'] ?? '익명';
-
-                                                    await FirebaseFirestore.instance
-                                                        .collection('users')
-                                                        .doc(receiverUid)
-                                                        .collection('notifications')
-                                                        .add({
-                                                      'notiType': 'like',
-                                                      'notiMsg': '$nickName님이 게시글을 좋아합니다.',
-                                                      'boardId': post['boardId'],
-                                                      'createdAt': FieldValue.serverTimestamp(),
-                                                      'isRead': false,
-                                                    });
-                                                  }
-                                                }
-                                              }
-                                            }
-                                        ),
-                                        Text('$likeCount', style: const TextStyle(fontSize: 12)),
-                                      ],
-                                    );
-                                  },
+                          // 이미지 슬라이드
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('boards')
+                                .doc(post['boardId'])
+                                .collection('boardFiles')
+                                .orderBy('isThumbNail', descending: true)
+                                .snapshots(),
+                            builder: (context, snap) {
+                              if (snap.hasData && snap.data!.docs.isNotEmpty) {
+                                final images =
+                                snap.data!.docs.map((e) => e['filePath'] as String).toList();
+                                return Column(
+                                  children: [
+                                    SizedBox(
+                                      height: 250,
+                                      child: PageView.builder(
+                                        controller: _pageController,
+                                        itemCount: images.length,
+                                        itemBuilder: (context, index) {
+                                          return Image.network(images[index],
+                                              fit: BoxFit.cover, width: double.infinity);
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SmoothPageIndicator(
+                                      controller: _pageController,
+                                      count: images.length,
+                                      effect: const ScrollingDotsEffect(
+                                        activeDotColor: Colors.black,
+                                        dotColor: Colors.grey,
+                                        dotHeight: 8,
+                                        dotWidth: 8,
+                                      ),
+                                    ),
+                                  ],
                                 );
-                              },
-                            ),
+                              } else {
+                                return const SizedBox.shrink();
+                              }
+                            },
+                          ),
 
-                            const SizedBox(width: 12),
-
-                            // 본문 텍스트
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(post['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 6),
-                                  AnimatedCrossFade(
-                                    crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-                                    duration: const Duration(milliseconds: 300),
-                                    firstChild: Linkify(
-                                      text: post['content'] ?? '',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      onOpen: _onOpenLink,
-                                    ),
-                                    secondChild: Linkify(
-                                      text: post['content'] ?? '',
-                                      onOpen: _onOpenLink,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  GestureDetector(
-                                    onTap: () => setState(() => isExpanded = !isExpanded),
-                                    child: Text(
-                                      isExpanded ? '간략히' : '더보기',
-                                      style: const TextStyle(color: Colors.blue),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // 댓글 미리보기
-                      StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('boards')
-                            .doc(post['boardId'])
-                            .collection('comments')
-                            .orderBy('createdAt', descending: true)
-                            .limit(1)
-                            .snapshots(),
-                        builder: (context, snapshot) {
-                          String preview = '댓글이 아직 없습니다.';
-
-                          if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                            final commentData = snapshot.data!.docs.first.data() as Map<String, dynamic>;
-                            preview = commentData['content'] ?? '내용 없음';
-                          }
-
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6),
+                          // 텍스트 본문
+                          Padding(
+                            padding: const EdgeInsets.all(12.0),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('💬 ', style: TextStyle(fontSize: 16)),
+                                // 좋아요 버튼
+                                StreamBuilder<DocumentSnapshot>(
+                                  stream: boardDoc.snapshots(),
+                                  builder: (context, boardSnapshot) {
+                                    final boardData =
+                                        boardSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+                                    final likeCount = boardData['likeCount'] ?? 0;
+
+                                    return StreamBuilder<DocumentSnapshot>(
+                                      stream: likeDoc.snapshots(),
+                                      builder: (context, snapshot) {
+                                        final isLiked = snapshot.data?.exists ?? false;
+
+                                        return Column(
+                                          children: [
+                                            IconButton(
+                                                icon: Icon(
+                                                  isLiked ? Icons.favorite : Icons.favorite_border,
+                                                  color: isLiked
+                                                      ? const Color(0xFFF45050)
+                                                      : Colors.grey,
+                                                ),
+                                                onPressed: () async {
+                                                  if (isLiked) {
+                                                    await likeDoc.delete();
+                                                    await boardDoc.update({
+                                                      'likeCount': FieldValue.increment(-1)
+                                                    });
+                                                  } else {
+                                                    await likeDoc.set({
+                                                      'likedAt': FieldValue.serverTimestamp()
+                                                    });
+                                                    await boardDoc.update({
+                                                      'likeCount': FieldValue.increment(1)
+                                                    });
+
+                                                    final receiverUid = post['userId'];
+                                                    if (userId != receiverUid) {
+                                                      final notiSettingSnap =
+                                                      await FirebaseFirestore.instance
+                                                          .collection('users')
+                                                          .doc(receiverUid)
+                                                          .collection('notiSettings')
+                                                          .doc('main')
+                                                          .get();
+
+                                                      final notiSettings = notiSettingSnap.data();
+                                                      final isLikeEnabled =
+                                                          notiSettings?['like'] ?? false;
+
+                                                      if (isLikeEnabled) {
+                                                        final userDoc =
+                                                        await FirebaseFirestore.instance
+                                                            .collection('users')
+                                                            .doc(userId)
+                                                            .get();
+
+                                                        final nickName =
+                                                            userDoc.data()?['nickName'] ?? '익명';
+
+                                                        await FirebaseFirestore.instance
+                                                            .collection('users')
+                                                            .doc(receiverUid)
+                                                            .collection('notifications')
+                                                            .add({
+                                                          'notiType': 'like',
+                                                          'notiMsg': '$nickName님이 게시글을 좋아합니다.',
+                                                          'boardId': post['boardId'],
+                                                          'createdAt':
+                                                          FieldValue.serverTimestamp(),
+                                                          'isRead': false,
+                                                        });
+                                                      }
+                                                    }
+                                                  }
+                                                }),
+                                            Text('$likeCount',
+                                                style: const TextStyle(fontSize: 12)),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+
+                                const SizedBox(width: 12),
+
+                                // 게시글 내용
                                 Expanded(
-                                  child: Text(
-                                    preview,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Colors.grey),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(post['title'] ?? '',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold)),
+                                      const SizedBox(height: 6),
+                                      AnimatedCrossFade(
+                                        crossFadeState: isExpanded
+                                            ? CrossFadeState.showSecond
+                                            : CrossFadeState.showFirst,
+                                        duration: const Duration(milliseconds: 300),
+                                        firstChild: Linkify(
+                                          text: post['content'] ?? '',
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          onOpen: _onOpenLink,
+                                        ),
+                                        secondChild: Linkify(
+                                          text: post['content'] ?? '',
+                                          onOpen: _onOpenLink,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      GestureDetector(
+                                        onTap: () => setState(() => isExpanded = !isExpanded),
+                                        child: Text(
+                                          isExpanded ? '간략히' : '더보기',
+                                          style: const TextStyle(color: Colors.blue),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                          );
-                        },
-                      )
-                    ],
-                  ),
-                ),
+                          ),
+
+                          // 댓글 미리보기
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('boards')
+                                .doc(post['boardId'])
+                                .collection('comments')
+                                .orderBy('createdAt', descending: true)
+                                .limit(1)
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              String preview = '댓글이 아직 없습니다.';
+
+                              if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                                final commentData =
+                                snapshot.data!.docs.first.data() as Map<String, dynamic>;
+                                preview = commentData['content'] ?? '내용 없음';
+                              }
+
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('💬 ', style: TextStyle(fontSize: 16)),
+                                    Expanded(
+                                      child: Text(
+                                        preview,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: Colors.grey),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               );
             },
           );

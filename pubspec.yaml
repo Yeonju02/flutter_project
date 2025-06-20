@@ -105,6 +105,7 @@ flutter:
     - assets/sleep_cycle_graph.png
     - assets/point_box.png
     - assets/used_point_box.png
+    - assets/board/
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
