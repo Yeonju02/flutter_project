@@ -1,25 +1,20 @@
-
-# ⚖️ 과실제로 - 교통사고 전문 로펌 플랫폼
+# ⚖️ 루틴로그 - 아침 루틴 설계 및 수면 관리
 
 ## 💡 프로젝트 소개
 
-**과실제로**는 교통사고 피해자가 블랙박스 영상과 사고 내용을 공유하면  
-전문 변호사들이 해당 사건에 대해 실시간으로 피드백하고,  
-사용자는 그 중 마음에 드는 변호사와 채팅 및 상담을 진행할 수 있는  
-교통사고 전문 변호사 매칭 플랫폼입니다.
+**루틴로그**는 사용자의 아침과 밤 루틴을 기록하고 관리하는 **습관 형성 앱**입니다.  
+작은 루틴을 쌓아가며 하루의 시작과 끝을 더욱 의미 있게 만들어 주는 앱입니다.
 
-- 고객은 사고 관련 영상을 게시글로 업로드  
-- 변호사들은 댓글과 전문 리뷰로 대응  
-- 사용자는 변호사를 선택해 실시간 상담 진행  
-- 상담 이후 리뷰 작성 및 계약 관리 가능  
+- 건강하고 규칙적인 삶을 도와주는 루틴 관리 앱  
+- 수면과 아침 루틴을 중심으로 습관을 형성할 수 있도록 유도
 
 ---
 
 ## 🗓 개발 기간
 
-- **03/13 ~ 03/20** : 기획 및 ERD, 테이블 설계  
-- **03/20 ~ 04/09** : 기능 개발  
-- **04/09 ~ 04/14** : UI 보완 및 마무리 점검
+- **06/09 ~ 06/11** : 기획 및 ERD, 테이블 설계  
+- **06/12 ~ 06/20** : 기능 개발  
+- **06/23 ~ 06/25** : UI 보완 및 마무리 점검
 
 ---
 
@@ -27,103 +22,54 @@
 
 | 이름 | GitHub 프로필 |
 |------|----------------|
-| 박새별 | [SaeByeol5285](https://github.com/SaeByeol5285) |
-| 김정철 | [ChunSamKim](https://github.com/ChunSamKim) |
 | 조연주 | [Yeonju02](https://github.com/Yeonju02) |
-| 유승호 | [minamRyu](https://github.com/minamRyu/Intro) |
-| 이주원 | [juwon2932](https://github.com/juwon2932) |
+| 김정철 | [ChunSamKim](https://github.com/ChunSamKim) |
+| 조나경 | [jonagyeong](https://github.com/jonagyeong) |
+| 나예린 | [nerongnyr](https://github.com/nerongnyr) |
 
 ---
 
-## 🛠 사용 기술
+## 🛠 기술 스택
 
-- Java 11 / JSP / Oracle DB  
-- Spring boot / MyBatis  
-- Vue.js 3 / jQuery  
-- Iamport 본인인증 API  
-- 카카오지도 API  
-- AI 블랙박스 모자이크 처리 API
-- 카카오 / 구글 / 네이버 로그인 API
-- Quill, Swiper, LangChain + Gemini (AI)
-- Python
+| ![Flutter](https://img.shields.io/badge/Flutter-3.x-blue?logo=flutter) | ![Dart](https://img.shields.io/badge/Dart-3.x-blue?logo=dart) | ![Firebase](https://img.shields.io/badge/Firebase%20Firestore-NoSQL-yellow?logo=firebase) | ![Google Login](https://img.shields.io/badge/Google%20Login-blue?logo=google) ![Kakao Login](https://img.shields.io/badge/Kakao%20Login-yellow?logo=kakaotalk) | ![Firebase Auth](https://img.shields.io/badge/Firebase%20Auth-green?logo=firebase) ![Firebase Storage](https://img.shields.io/badge/Firebase%20Storage-orange?logo=firebase) |
 
 ---
 
-## 📕 발표 PPT  
-[▶ 과실제로 발표 PPT](https://drive.google.com/file/d/16b62kuGLnBxYrV_PAOYX5HQSF9qK51Kx/view?usp=drive_link)
+## 📱 주요 기능
 
-## 🎞 시연 영상  
-[▶ 과실제로 핵심기능 시연 영상](https://drive.google.com/file/d/1erdU57Da71Rt3PvvUt7lkM8fbHMvL8Fa/view?usp=sharing)
-
-[팀원별 페이지 시연 영상]
-
-  [▶박새별](https://drive.google.com/file/d/1KYe6_MAVMIwSILGeuixbDFpA81i0jkD0/view?usp=drive_link)
-  
-  [▶김정철](https://drive.google.com/file/d/1owCZxth38De0PlNbQWZyuNjqD76NlTDK/view?usp=drive_link)
-  
-  [▶조연주](https://drive.google.com/file/d/1kFrRd876UF55wYAXayrs3kqn787k4w3F/view?usp=drive_link)
-  
-  [▶유승호](https://drive.google.com/file/d/1nE4d4DQLzHeSaB9VKoJkx036C8usRpve/view?usp=drive_link)
-  
-  [▶이주원](https://drive.google.com/file/d/1WbIq-TAMugFVCtj2JI1knkPa4TBFruqE/view?usp=drive_link)
+1. ⏰ **수면 목표 시간에 맞춰 수면 시작 시간 제공**
+2. 🎮 **루틴 완료 시 경험치 증가, 레벨업 시스템**
+   - 레벨업 시 보상 상자 제공, 특정 레벨 달성 시 룰렛 가능
+   - 기상 시 간단한 상식문제 → 적은 경험치 제공
+   - 매달 바뀌는 **월간미션** 수행 시 경험치 제공
+3. 🔁 **루틴 연속 성공 streak 관리**
+4. 📝 **루틴 추천 기능, 나만의 루틴 저장으로 반복 루틴 관리**
+5. 🗣 **커뮤니티 기능 (게시판, 댓글 등)**
 
 ---
 
-## 👨‍💻 주요 기능
+## 👨‍💻 역할 분담
 
-- ✅ **사용자 기능**
-  - 블랙박스 사고 게시글 등록 (영상 업로드 포함)
-  - 변호사 리뷰 확인 및 채팅 상담 연결
-  - 마이페이지에서 결제 내역, 채팅 내역, 내가 작성한 글/리뷰 관리
-
-- ✅ **변호사 기능**
-  - 사건 게시글 열람 후 댓글 및 전문 리뷰 등록
-  - 사용자와의 채팅 기능
-  - 본인 인증 및 경력, 자격 등록 시스템
-
-- ✅ **관리자 기능**
-  - 변호사 인증 승인 시스템 (자격 서류 확인)
-  - 사이트 약관 및 공지 관리
+| 이름 | 담당 역할 |
+|------|-----------|
+| **조나경** | 메인 디자인 완성, 마이페이지 기능 구현 |
+| **김정철** | 로그인/회원가입, 메인 기능 구현 |
+| **조연주** | 쇼핑몰 구현, 회원/대시보드/상품 관리자 페이지 |
+| **나예린** | 게시판 구현, 게시판 관리자 페이지, 알림 페이지 |
 
 ---
 
-## 🧑‍💼 역할 분담
-
-### 😎 박새별
-- **주요 페이지**: 메인페이지
-- **기능 구현**: 메인/헤더 스타일링, 통합자료실, 회사 소개, 후기/AI 후기 분석, 공통 CSS, 팀장(발표자료, 회의, 구글 드라이브 관리, 깃허브)
-
-
-### 😇 김정철
-- **주요 페이지**: 게시글 페이지. 계약 페이지 등
-- **기능 구현**: 알림 기능, 북마크 기능, 채팅 기능, 게시글 기능, 모자이크 및 키워드 추출과 같은 코드 통합
-
-### 😊 조연주
-- **주요 페이지**: 패키지 구매, 관리자 페이지(상품 관리), 변호사 마이페이지, 법률 사무소 찾기
-- **기능 구현**: 결제/환불, 패키지 CRUD, 전화 상담 패키지 차감, 카카오맵 API
-
-### 🐴 유승호
-- **주요 페이지**: 관리자 페이지, 변호사 관련 페이지
-- **기능 구현**: quill editor, Apex chart 그리기
-
-### 🐯 이주원
-- **주요 페이지**: 로그인 / 회원가입 / 사용자 마이페이지 / 이용약관 / 에러페이지
-- **기능 구현**: 소셜 로그인 api 추가 / 본인인증 api 추가
-
----
-
-## 📫 문의
-
-프로젝트에 대한 문의는 [박새별]()에게 연락주세요.
-
----
-
-## 📂 프로젝트 자료 모음
+## 📂 관련 자료들
 
 | 분류 | 링크 |
 |------|------|
-| 📝 회의록 | [회의록 보기](https://drive.google.com/drive/folders/1bpM3vTIY-6_Rf_6FwxaOvptJlfphWDZC) |
-| 🏗 설계 자료 | [설계 보기](https://drive.google.com/drive/folders/1WqbDMTMkynVD0cCp9hnwFD0ld0HBcUQW) |
-| 📚 공통 문서 | [공통 문서 보기](https://drive.google.com/drive/folders/1Xm2uaNjuhy3Qlk6FlUh8F5hIuKT3p7nS) |
+| 🎨 피그마 | [모든 거 여기서 작업](https://www.figma.com/file/example) |
+| 📁 구글 공유 문서 | [링크 바로가기](https://drive.google.com/drive/folders/1qER8y17_Hqc0VLBOQrmFhK0u1yCShDEP) |
+| 🧑‍💻 GitHub | [프로젝트 저장소](https://github.com/Yeonju02/flutter_project) |
+| 🔥 Firebase | [파이어베이스 콘솔](https://console.firebase.google.com/project/routine-log-app/database?hl=ko&fbclid=CjwKCAjw5-CBhBIEiwAzfVywLg-tTt3pKOoc6nsbNkxDJUA-SeXcbzX_FKWW9oQdW7xNMERSLdKoRoCkOUoQAvD_BwE) |
 
 ---
+
+## 📞 문의
+
+- 프로젝트 관련 문의는 [조연주](https://github.com/Yeonju02)에게 연락해주세요.
