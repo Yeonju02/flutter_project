@@ -1,4 +1,3 @@
-import 'dart:ffi';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -74,7 +73,6 @@ class _MyPageMainState extends State<MyPageMain> {
             userData = doc.data();
             nicknameController.text = userData?['nickName'] ?? '';
             emailController.text = userData?['userEmail'] ?? '';
-            // addressController.text = userData?['address'] ?? '';
           });
         } else {
           print("사용자 문서가 존재하지 않습니다.");
@@ -117,7 +115,7 @@ class _MyPageMainState extends State<MyPageMain> {
 
     final query = isCompleted
         ? ordersRef.where('status', isEqualTo: '배송완료')
-        : ordersRef.where('status', whereIn: ['결제완료', '취소됨']);
+        : ordersRef.where('status', whereIn: ['결제완료', '배송중', '취소됨']);
 
     final snapshot = await query.get();
     List<Map<String, dynamic>> results = [];
@@ -170,27 +168,25 @@ class _MyPageMainState extends State<MyPageMain> {
     for (var doc in snapshot.docs) {
       final orderData = doc.data() as Map<String, dynamic>;
       final productId = orderData['productId'] as String;
-      final selectedColor = (orderData['selectedColor'] ?? '').toString().trim();
+      final selectedColorRaw = orderData['selectedColor'] ?? '';
+      final selectedColor = selectedColorRaw.toString().trim().toLowerCase();
 
+      final orderId = orderData['orderId'] as String? ?? doc.id;
+      final reviewDocId = '${user.uid}_$orderId';
 
-      // 리뷰 문서 확인
       final reviewDoc = await FirebaseFirestore.instance
           .collection('products')
           .doc(productId)
           .collection('reviews')
-          .doc(user.uid)
+          .doc(reviewDocId)
           .get();
 
-      final reviewColor = (reviewDoc.data()?['selectedColor'] ?? '').toString();
-      final hasMatchingReview = reviewDoc.exists && reviewColor == selectedColor;
 
-      if (hasMatchingReview) continue;
+      final hasMatchingReview = reviewDoc.exists;
 
-      print("검사 중: productId=$productId / selectedColor=$selectedColor");
-      if (reviewDoc.exists) {
-        print("리뷰 있음, selectedColor=${reviewDoc.data()?['selectedColor']}");
+      if (hasMatchingReview) {
+        continue;
       }
-
 
       // 상품 데이터 불러오기
       final productDoc = await FirebaseFirestore.instance
@@ -199,10 +195,13 @@ class _MyPageMainState extends State<MyPageMain> {
           .get();
 
       final productData = productDoc.data();
-      if (productData == null) continue;
+      if (productData == null) {
+        continue;
+      }
 
       final colorsList = productData['colors'] as List<dynamic>? ?? [];
       final imgPath = _getImageBySelectedColor(colorsList, selectedColor);
+
 
       results.add({
         ...orderData,
@@ -211,8 +210,8 @@ class _MyPageMainState extends State<MyPageMain> {
         'productPrice': productData['productPrice'] ?? 0,
         'productImage': imgPath.startsWith('http') ? imgPath : '',
       });
-
     }
+
 
     return results;
   }
@@ -230,7 +229,7 @@ class _MyPageMainState extends State<MyPageMain> {
     return '';
   }
 
-  // 리뷰 리스트 가져오기
+  // 리뷰 목록 가져오기
   Future<List<Map<String, dynamic>>> fetchMyReviewList(List<String> myProductIds) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
@@ -238,75 +237,101 @@ class _MyPageMainState extends State<MyPageMain> {
     List<Map<String, dynamic>> result = [];
 
     for (String productId in myProductIds) {
-      final reviewDoc = await FirebaseFirestore.instance
+      // 모든 리뷰 문서 조회
+      final reviewSnapshot = await FirebaseFirestore.instance
           .collection('products')
           .doc(productId)
           .collection('reviews')
-          .doc(user.uid)
           .get();
 
-      if (!reviewDoc.exists) continue;
+      for (var doc in reviewSnapshot.docs) {
+        final docId = doc.id;
 
-      final reviewData = reviewDoc.data()!;
-      final selectedColor = (reviewData['selectedColor'] ?? '').toString();
+        if (!docId.startsWith('${user.uid}_')) continue;
 
-      final productDoc = await FirebaseFirestore.instance
-          .collection('products')
-          .doc(productId)
-          .get();
+        final reviewData = doc.data();
+        final selectedColor = (reviewData['selectedColor'] ?? '').toString();
 
-      final productData = productDoc.data();
-      if (productData == null) continue;
+        final productDoc = await FirebaseFirestore.instance
+            .collection('products')
+            .doc(productId)
+            .get();
 
-      final colorsList = productData['colors'] as List<dynamic>? ?? [];
+        final productData = productDoc.data();
+        if (productData == null) continue;
 
-      final hasMatchingColor = colorsList.any(
-            (color) => (color['color'] ?? '').toString() == selectedColor,
-      );
-      if (!hasMatchingColor) continue;
+        final colorsList = productData['colors'] as List<dynamic>? ?? [];
 
-      final imgPath = getImageUrlFromColors(colorsList, selectedColor);
+        final hasMatchingColor = colorsList.any(
+              (color) => (color['color'] ?? '').toString() == selectedColor,
+        );
+        if (!hasMatchingColor) continue;
 
-      result.add({
-        ...reviewData,
-        'productId': productId,
-        'productName': productData['productName'] ?? '',
-        'productImage': imgPath.startsWith('http') ? imgPath : '',
-        'productPrice': productData['productPrice'] ?? 0,
-        'selectedColor': selectedColor,
-        'colors': colorsList,
-        'description' : productData['description'] ?? '',
-      });
+        final imgPath = getImageUrlFromColors(colorsList, selectedColor);
+
+        result.add({
+          ...reviewData,
+          'productId': productId,
+          'orderId': doc.id,
+          'productName': productData['productName'] ?? '',
+          'productImage': imgPath.startsWith('http') ? imgPath : '',
+          'productPrice': productData['productPrice'] ?? 0,
+          'selectedColor': selectedColor,
+          'colors': colorsList,
+          'description': productData['description'] ?? '',
+        });
+      }
     }
 
     return result;
   }
 
-  // 내가 작성한 리뷰 지우기
-  Future<void> deleteReview(String productId, String userId) async {
+
+
+  // 내가 작성한 리뷰 삭제하기
+  Future<void> deleteReview(String productId, String orderId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    String reviewDocId;
+    if (orderId.startsWith(user.uid)) {
+      reviewDocId = orderId;
+    } else {
+      reviewDocId = '${user.uid}_$orderId';
+    }
+
+
     await FirebaseFirestore.instance
         .collection('products')
         .doc(productId)
         .collection('reviews')
-        .doc(userId)
+        .doc(reviewDocId)
         .delete();
   }
 
   // 내가 작성한 리뷰 수정하기
-  Future<void> showEditReviewDialog(BuildContext context, Map<String, dynamic> review, VoidCallback onUpdated) async {
+  Future<void> showEditReviewDialog(
+      BuildContext context,
+      Map<String, dynamic> review,
+      String reviewDocId,
+      VoidCallback onUpdated,
+      ) async {
     final TextEditingController contentController = TextEditingController(text: review['contents'] ?? '');
     int selectedScore = (review['score'] is int) ? review['score'] as int : 0;
 
-    await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) {
-          return StatefulBuilder(
+    await showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierLabel: "리뷰 수정",
+      transitionDuration: Duration(milliseconds: 300),
+      pageBuilder: (ctx, animation, secondaryAnimation) {
+        return Center(
+          child: StatefulBuilder(
             builder: (context, setDialogState) {
               return Dialog(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Material(
-                  color: Colors.white, // 다이얼로그 배경을 흰색으로 명시
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   child: SizedBox(
                     width: 350,
@@ -317,7 +342,6 @@ class _MyPageMainState extends State<MyPageMain> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 제목과 닫기 버튼
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -332,40 +356,26 @@ class _MyPageMainState extends State<MyPageMain> {
                               ],
                             ),
                             SizedBox(height: 16),
-
-                            // 별점 선택 UI
                             Text('별점 (1~5)', style: TextStyle(fontWeight: FontWeight.w600)),
                             SizedBox(height: 6),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: List.generate(5, (i) {
-                                  final starIndex = i + 1;
-                                  return GestureDetector(
-                                    onTap: () {
-                                      setDialogState(() {
-                                        selectedScore = starIndex;
-                                      });
-                                    },
-                                    child: Icon(
-                                      starIndex <= selectedScore ? Icons.star : Icons.star_border,
-                                      color: Colors.amber,
-                                      size: 30,
-                                    ),
-                                  );
-                                }),
-                              ),
+                            Row(
+                              children: List.generate(5, (i) {
+                                final starIndex = i + 1;
+                                return GestureDetector(
+                                  onTap: () {
+                                    setDialogState(() {
+                                      selectedScore = starIndex;
+                                    });
+                                  },
+                                  child: Icon(
+                                    starIndex <= selectedScore ? Icons.star : Icons.star_border,
+                                    color: Colors.amber,
+                                    size: 30,
+                                  ),
+                                );
+                              }),
                             ),
-
                             SizedBox(height: 16),
-
-                            // 리뷰 내용 입력
                             Text('리뷰 내용', style: TextStyle(fontWeight: FontWeight.w600)),
                             SizedBox(height: 6),
                             TextField(
@@ -386,7 +396,6 @@ class _MyPageMainState extends State<MyPageMain> {
                               ),
                             ),
                             SizedBox(height: 35),
-
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
@@ -407,12 +416,14 @@ class _MyPageMainState extends State<MyPageMain> {
                                     return;
                                   }
 
-                                  // Firestore 업데이트
+                                  final user = FirebaseAuth.instance.currentUser;
+                                  if (user == null) return;
+
                                   await FirebaseFirestore.instance
                                       .collection('products')
                                       .doc(review['productId'])
                                       .collection('reviews')
-                                      .doc(review['userId'])
+                                      .doc(reviewDocId)
                                       .update({
                                     'contents': newContent,
                                     'score': selectedScore,
@@ -440,9 +451,24 @@ class _MyPageMainState extends State<MyPageMain> {
                 ),
               );
             },
-          );
-        });
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final offsetAnimation = Tween<Offset>(
+          begin: Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+
+        return SlideTransition(
+          position: offsetAnimation,
+          child: child,
+        );
+      },
+    );
   }
+
+
 
 
   List<Map<String, dynamic>> orderList = [];
@@ -457,10 +483,10 @@ class _MyPageMainState extends State<MyPageMain> {
     if (user == null) return;
 
     List<Map<String, dynamic>> allOrders = [];
-    List<Map<String, dynamic>> completedOrders = await fetchCompletedOrderList(); // 리뷰 걸러진 배송완료
-    List<Map<String, dynamic>> pendingOrders = await fetchOrderList(false); // 결제완료 + 취소됨
+    List<Map<String, dynamic>> completedOrders = await fetchCompletedOrderList();
+    List<Map<String, dynamic>> pendingOrders = await fetchOrderList(false);
 
-    allOrders = [...pendingOrders, ...completedOrders]; // 한꺼번에 다 담는다
+    allOrders = [...pendingOrders, ...completedOrders];
 
     setState(() {
       orderList = allOrders;
@@ -529,16 +555,13 @@ class _MyPageMainState extends State<MyPageMain> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Firestore에 notiEnable 필드 업데이트
     await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
       'notiEnable': enable,
     });
 
-    // 전체 알림이 꺼졌거나 켜졌을 때 하위 알림 동기화
     commentNotification = enable;
     likeNotification = enable;
 
-    // 하위 알림 설정도 Firestore에 반영
     await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -549,7 +572,6 @@ class _MyPageMainState extends State<MyPageMain> {
       'like': likeNotification,
     });
 
-    // UI 갱신
     setState(() {});
   }
 
@@ -587,7 +609,6 @@ class _MyPageMainState extends State<MyPageMain> {
     for (var doc in querySnapshot.docs) {
       Map<String, dynamic> postData = doc.data();
 
-      // boardFiles 서브컬렉션에서 isThumbNail == true인 첫번째 문서 가져오기
       final thumbQuery = await FirebaseFirestore.instance
           .collection('boards')
           .doc(doc.id)
@@ -638,7 +659,6 @@ class _MyPageMainState extends State<MyPageMain> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 제목과 닫기 버튼 Row
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -703,7 +723,6 @@ class _MyPageMainState extends State<MyPageMain> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(content: Text("회원 탈퇴가 완료되었습니다.")),
                                 );
-                                // 탈퇴 후 추가 작업(로그아웃, 화면 이동 등) 필요
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(content: Text("비밀번호가 올바르지 않습니다.")),
@@ -751,7 +770,6 @@ class _MyPageMainState extends State<MyPageMain> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 제목과 닫기 버튼
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -785,12 +803,10 @@ class _MyPageMainState extends State<MyPageMain> {
                         padding: EdgeInsets.symmetric(vertical: 14),
                       ),
                       onPressed: () async {
-                        Navigator.of(context).pop(); // 다이얼로그 닫고
+                        Navigator.of(context).pop();
 
-                        // 로그아웃 처리 예시 (FirebaseAuth 기준)
                         await FirebaseAuth.instance.signOut();
 
-                        // 로그아웃 후 로그인 페이지로 이동
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(builder: (context) => LoginPage()),
@@ -841,21 +857,15 @@ class _MyPageMainState extends State<MyPageMain> {
         email: user.email!, password: password);
 
     try {
-      // 재인증 시도 (비밀번호 확인)
       await user.reauthenticateWithCredential(cred);
 
-      // 재인증 성공 시 Firestore users 문서에서 deleted true로 변경
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .update({'deleted': true});
 
-      // 필요하면 Firebase Auth 유저 삭제도 가능
-      // await user.delete();
-
       return true;
     } catch (e) {
-      // 비밀번호 틀림 혹은 기타 오류
       return false;
     }
   }
@@ -903,14 +913,14 @@ class _MyPageMainState extends State<MyPageMain> {
                 userData?['imgPath'] = originalImagePath;
               }
             });
-            Navigator.of(context).pop(); // 다이얼로그 닫기
-            Navigator.of(context).pop(); // 프로필 편집 닫기
+            Navigator.of(context).pop();
+            Navigator.of(context).pop();
           },
         ),
         TextButton(
           child: Text('취소'),
           onPressed: () {
-            Navigator.of(context).pop(); // 다이얼로그 닫기만
+            Navigator.of(context).pop();
           },
         ),
       ],
@@ -933,7 +943,6 @@ class _MyPageMainState extends State<MyPageMain> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 제목 및 닫기 버튼 Row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1277,18 +1286,15 @@ class _MyPageMainState extends State<MyPageMain> {
   Widget _orderHistory() {
     orderList.sort((a, b) {
       if (a['status'] == b['status']) return 0;
-      if (a['status'] == '취소됨') return 1; // 취소됨은 뒤로
+      if (a['status'] == '취소됨') return 1;
       if (b['status'] == '취소됨') return -1;
       return 0;
     });
 
     final pendingOrders = orderList
-        .where((order) => order['status'] == '결제완료' || order['status'] == '취소됨')
+        .where((order) => order['status'] == '결제완료' || order['status'] == '배송중' || order['status'] == '취소됨')
         .toList();
 
-    final completedOrders = orderList
-        .where((order) => order['status'] == '배송완료')
-        .toList();
 
     final showList = selectedDeliveryTab == 0
         ? pendingOrders
@@ -1301,17 +1307,90 @@ class _MyPageMainState extends State<MyPageMain> {
     return Column(
       children: [
         SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildDeliveryTabButton("배송 대기 목록", 0),
-            SizedBox(width: 12),
-            _buildDeliveryTabButton("배송 완료 목록", 1),
-            SizedBox(width: 12),
-            _buildDeliveryTabButton("내 리뷰", 2),
-          ],
+        Container(
+          margin: EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final tabCount = 3;
+              final tabWidth = constraints.maxWidth / tabCount;
+
+              return Stack(
+                children: [
+                  // 움직이는 흰색 박스
+                  AnimatedPositioned(
+                    duration: Duration(milliseconds: 250),
+                    curve: Curves.easeInOut,
+                    left: selectedDeliveryTab * tabWidth,
+                    top: 0,
+                    width: tabWidth,
+                    height: 48,
+                    child: Container(
+                      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  Row(
+                    children: List.generate(tabCount, (index) {
+                      final titles = ["배송 대기 목록", "배송 완료 목록", "내 리뷰"];
+                      final isSelected = selectedDeliveryTab == index;
+
+                      return Expanded(
+                        child: GestureDetector(
+                          onTap: () async {
+                            setState(() {
+                              selectedDeliveryTab = index;
+                              isLoading = true;
+                            });
+
+                            if (index == 1) {
+                              final updatedCompleted = await fetchCompletedOrderList();
+                              setState(() {
+                                completedOrders = updatedCompleted;
+                                isLoading = false;
+                              });
+                            } else {
+                              setState(() {
+                                isLoading = false;
+                              });
+                            }
+                          },
+                          child: Container(
+                            height: 48,
+                            alignment: Alignment.center,
+                            child: AnimatedDefaultTextStyle(
+                              duration: Duration(milliseconds: 200),
+                              style: TextStyle(
+                                color: isSelected ? Color(0xFF272727) : Colors.grey,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 14,
+                              ),
+                              child: Text(titles[index]),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
+
         SizedBox(height: 24),
+
         Expanded(
           child: isLoading
               ? Center(child: Text("로딩중..."))
@@ -1331,7 +1410,7 @@ class _MyPageMainState extends State<MyPageMain> {
                   style: TextStyle(fontSize: 16, color: Colors.black54),
                 ),
                 SizedBox(height: 20),
-                if (selectedDeliveryTab == 0) // 배송 대기 탭일 때만 버튼 표시
+                if (selectedDeliveryTab == 0)
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -1373,20 +1452,8 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
 
-  double _getProgress(String status) {
-    switch (status) {
-      case '결제완료':
-        return 0.33;
-      case '배송중':
-        return 0.66;
-      case '배송완료':
-        return 1.0;
-      default:
-        return 0.0;
-    }
-  }
 
-  // 결제완료 + 취소됨 주문 대기 리스트
+  // 결제완료(배송전) + 배송중 + 취소됨 배송 대기 리스트
   Widget _buildPendingOrderItem(Map<String, dynamic> order) {
     final imgUrl = (order['productImage'] ?? '').toString().trim();
     final hasImage = imgUrl.isNotEmpty && imgUrl.startsWith('http');
@@ -1394,14 +1461,19 @@ class _MyPageMainState extends State<MyPageMain> {
     final selectedColor = order['selectedColor'] ?? '';
 
     Color _statusColor(String target) {
-      if (status == '결제완료') {
-        return target == '결제완료' ? Colors.black : Colors.grey.shade300;
-      } else if (status == target) {
-        return Colors.black;
-      } else {
-        return Colors.grey.shade300;
+      if (status == '배송중') {
+        // 배송중일 때는 '결제완료'와 '배송중' 둘 다 검정색
+        if (target == '결제완료' || target == '배송중') {
+          return Colors.black;
+        } else {
+          return Colors.grey.shade300;
+        }
       }
+
+      // 그 외는 상태와 같을 때만 검정, 아니면 회색
+      return status == target ? Colors.black : Colors.grey.shade300;
     }
+
 
     double _getProgress(String status) {
       switch (status) {
@@ -1473,10 +1545,9 @@ class _MyPageMainState extends State<MyPageMain> {
           ),
           SizedBox(height: 30),
 
-          // status가 '취소됨'일 경우 UI 분기 처리
           if (status == '취소됨') ...[
             Align(
-              alignment: Alignment.centerLeft, // 왼쪽 정렬
+              alignment: Alignment.centerLeft,
               child: Text(
                 "주문 취소중",
                 style: TextStyle(
@@ -1529,7 +1600,7 @@ class _MyPageMainState extends State<MyPageMain> {
     );
   }
 
-  // 배송 완료되자마자 보일 주문 완료 리스트
+  // 배송 완료되자마자 보일 배송 완료 리스트
   Widget _buildCompletedOrderItem(Map<String, dynamic> order) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1550,51 +1621,62 @@ class _MyPageMainState extends State<MyPageMain> {
               Text("배송 완료", style: TextStyle(fontSize: 12)),
               TextButton(
                 onPressed: () {
-                  // 교환/환불 로직
                 },
                 child: Text("교환/환불 신청", style: TextStyle(color: Colors.red)),
+                style: TextButton.styleFrom(
+                  minimumSize: Size(0, 30),
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
             ],
           ),
+
           SizedBox(height: 8),
 
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Image.network(
-                order['productImage'],
-                width: 60,
-                height: 60,
-                fit: BoxFit.cover,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  order['productImage'] ?? '',
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.cover,
+                ),
               ),
               SizedBox(width: 12),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            order['productName'],
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Text(
-                          "${order['productPrice']} 원",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
+                    Text(
+                      order['productName'] ?? '',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(height: 4),
+                    if ((order['selectedColor'] ?? '').isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          "선택한 옵션 : ${order['selectedColor']}",
+                          style: TextStyle(color: Colors.grey[700]),
+                        ),
+                      ),
                   ],
                 ),
               ),
+
+              Text(
+                "${order['productPrice']} 원",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ],
           ),
+
           SizedBox(height: 12),
 
           Center(
@@ -1618,8 +1700,7 @@ class _MyPageMainState extends State<MyPageMain> {
               ),
               child: Text("리뷰 작성하기"),
             ),
-          )
-
+          ),
         ],
       ),
     );
@@ -1670,7 +1751,6 @@ class _MyPageMainState extends State<MyPageMain> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) {
-                                      print('🧩 review: $review');
                                       return ProductDetailPage(data: review);
                                     }
                                   ),
@@ -1719,8 +1799,8 @@ class _MyPageMainState extends State<MyPageMain> {
                               ),
                               if (selectedColor.isNotEmpty)
                                 Text(
-                                  "색상: $selectedColor",
-                                  style: TextStyle(color: Colors.grey),
+                                  "선택한 옵션: $selectedColor",
+                                  style: TextStyle(color: Colors.grey[700]),
                                 ),
                             ],
                           ),
@@ -1729,9 +1809,13 @@ class _MyPageMainState extends State<MyPageMain> {
                         PopupMenuButton<String>(
                           icon: Icon(Icons.more_vert),
                           onSelected: (value) async {
+                            final user = FirebaseAuth.instance.currentUser;
+                            if (user == null) return;
+
+                            final reviewDocId = review['orderId'] ?? '';
+
                             if (value == 'edit') {
-                              await showEditReviewDialog(context, review, () {
-                                // 수정 후 리스트 다시 로드(예: setState 혹은 FutureBuilder 다시 실행)
+                              await showEditReviewDialog(context, review, reviewDocId, () {
                                 setState(() {});
                               });
                             } else if (value == 'delete') {
@@ -1747,9 +1831,9 @@ class _MyPageMainState extends State<MyPageMain> {
                                 ),
                               );
                               if (confirmed == true) {
-                                await deleteReview(review['productId'], review['userId']);
+                                await deleteReview(review['productId'], reviewDocId);
                                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('리뷰가 삭제되었습니다.')));
-                                setState(() {}); // 리스트 갱신
+                                setState(() {});
                               }
                             }
                           },
@@ -1757,13 +1841,14 @@ class _MyPageMainState extends State<MyPageMain> {
                             PopupMenuItem(value: 'edit', child: Text('리뷰 수정')),
                             PopupMenuItem(value: 'delete', child: Text('리뷰 삭제')),
                           ],
-                        ),
+                        )
+
+
                       ],
                     ),
 
                     SizedBox(height: 12),
 
-                    // 리뷰 사진들 (왼쪽 정렬 가로 스크롤)
                     if (reviewImages.isNotEmpty)
                       SizedBox(
                         height: 100,
@@ -1838,7 +1923,6 @@ class _MyPageMainState extends State<MyPageMain> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 헤더
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -1898,7 +1982,6 @@ class _MyPageMainState extends State<MyPageMain> {
                               return;
                             }
 
-                            // Firestore에 주문 상태 변경
                             final user = FirebaseAuth.instance.currentUser;
                             if (user != null) {
                               final orderRef = FirebaseFirestore.instance
@@ -1941,12 +2024,10 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
   // 리뷰 작성 다이얼로그
-  BuildContext? _dialogContext; // 전역처럼 써도 됨
+  BuildContext? _dialogContext;
 
   Future<bool> showReviewDialog(BuildContext context, Map<String, dynamic> order) async {
-    bool isReviewSaved = false;
-
-    await showGeneralDialog(
+    final result = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
       barrierLabel: "리뷰 작성",
@@ -1974,11 +2055,11 @@ class _MyPageMainState extends State<MyPageMain> {
       },
     );
 
-    return isReviewSaved; // ✅ 결과 리턴
+    return result ?? false;
   }
 
 
-
+  // 리뷰 작성 후 저장
   Widget ReviewDialog(Map<String, dynamic> order, {required VoidCallback onReviewSaved}) {
     final TextEditingController reviewController = TextEditingController();
     int selectedScore = 0;
@@ -2146,6 +2227,11 @@ class _MyPageMainState extends State<MyPageMain> {
                     onPressed: () async {
                       final user = FirebaseAuth.instance.currentUser;
                       if (user == null) return;
+
+                      final orderId = order['orderId'];
+                      final reviewDocId = '${user.uid}_$orderId';
+
+
                       try {
                         List<String> uploadedImageUrls = [];
                         for (var img in selectedImages) {
@@ -2164,7 +2250,7 @@ class _MyPageMainState extends State<MyPageMain> {
                             .collection('products')
                             .doc(order['productId'])
                             .collection('reviews')
-                            .doc(user.uid)
+                            .doc(reviewDocId)
                             .set(reviewData);
 
                         onReviewSaved();
@@ -2199,50 +2285,6 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
 
-
-
-  // 배송 대기 목록 & 배송 완료 목록 버튼 활성화/비활성화 부분
-  
-  // UI 수정중
-  Widget _buildDeliveryTabButton(String title, int index) {
-    final bool isSelected = selectedDeliveryTab == index;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedDeliveryTab = index;
-        });
-        loadOrders();
-      },
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? Color(0xFF272727) : Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: isSelected
-              ? [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            )
-          ]
-              : [],
-        ),
-        child: Text(
-          title,
-          style: TextStyle(
-            color: isSelected ? Color(0xFFA0AEC0) : Color(0xFF888888),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
-
-
   /////// - 환경 설정- ///////
 
   // 고객센터 다이얼로그
@@ -2261,7 +2303,7 @@ class _MyPageMainState extends State<MyPageMain> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 제목 + 닫기 버튼
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -2279,7 +2321,6 @@ class _MyPageMainState extends State<MyPageMain> {
                   ),
                   SizedBox(height: 16),
 
-                  // 내용 텍스트
                   Text(
                     "고객센터 기능은 추후 개발 예정입니다.",
                     style: TextStyle(fontSize: 16, color: Colors.black87),
@@ -2308,7 +2349,6 @@ class _MyPageMainState extends State<MyPageMain> {
             SizedBox(height: 12),
             Divider(),
 
-            // 기존 알림 설정 토글들
             _buildToggleTile("전체 알림 받기", notiEnabled ?? true, (val) async {
               notiEnabled = val;
               await _updateNotiEnable(val);
@@ -2350,7 +2390,6 @@ class _MyPageMainState extends State<MyPageMain> {
 
             SizedBox(height: 30),
 
-            // 고객센터 섹션 추가
             Text("고객센터",
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             SizedBox(height: 12),
@@ -2548,13 +2587,12 @@ class _MyPageMainState extends State<MyPageMain> {
                 margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 padding: EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Color(0xFF92BBE2),
+                  color: Color(0xFF90ACD3),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    // 내 게시물
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
@@ -2603,7 +2641,6 @@ class _MyPageMainState extends State<MyPageMain> {
                       color: Colors.white.withOpacity(0.3),
                     ),
 
-                    // 주문 내역
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
@@ -2652,7 +2689,6 @@ class _MyPageMainState extends State<MyPageMain> {
                       color: Colors.white.withOpacity(0.3),
                     ),
 
-                    // 환경 설정
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
@@ -2711,7 +2747,6 @@ class _MyPageMainState extends State<MyPageMain> {
             ],
           ),
 
-          // 하단 네비게이션
           Positioned(
             left: 0,
             right: 0,
