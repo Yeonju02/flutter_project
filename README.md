@@ -31,7 +31,7 @@
 
 ## 🛠 기술 스택
 
-![Flutter](https://img.shields.io/badge/Flutter-3.x-blue?logo=flutter) | ![Dart](https://img.shields.io/badge/Dart-3.x-blue?logo=dart) | ![Firebase](https://img.shields.io/badge/Firebase%20Firestore-NoSQL-yellow?logo=firebase) | ![Google Login](https://img.shields.io/badge/Google%20Login-blue?logo=google) ![Kakao Login](https://img.shields.io/badge/Kakao%20Login-yellow?logo=kakaotalk) | ![Firebase Auth](https://img.shields.io/badge/Firebase%20Auth-green?logo=firebase) ![Firebase Storage](https://img.shields.io/badge/Firebase%20Storage-orange?logo=firebase)
+![Flutter](https://img.shields.io/badge/Flutter-3.x-blue?logo=flutter) | ![Dart](https://img.shields.io/badge/Dart-3.x-blue?logo=dart) | ![Firebase](https://img.shields.io/badge/Firebase%20Firestore-NoSQL-yellow?logo=firebase) | ![Google Login](https://img.shields.io/badge/Google%20Login-blue?logo=google)| ![Firebase Auth](https://img.shields.io/badge/Firebase%20Auth-green?logo=firebase) ![Firebase Storage](https://img.shields.io/badge/Firebase%20Storage-orange?logo=firebase)
 
 ---
 
