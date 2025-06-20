@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/lib/route_observer.dart';
 
-
 class XPLevelBar extends StatefulWidget {
   const XPLevelBar({super.key});
 
@@ -37,17 +36,18 @@ class _XPLevelBarState extends State<XPLevelBar> with RouteAware {
 
   @override
   void didPopNext() {
-    // 다른 페이지에서 돌아왔을 때
     _loadXPLevel();
   }
 
   Future<void> _loadXPLevel() async {
+    if (!mounted) return;
     setState(() => isLoading = true);
 
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId');
 
     if (userId == null) {
+      if (!mounted) return;
       setState(() => isLoading = false);
       return;
     }
@@ -60,12 +60,14 @@ class _XPLevelBarState extends State<XPLevelBar> with RouteAware {
 
     if (query.docs.isNotEmpty) {
       final data = query.docs.first.data();
+      if (!mounted) return;
       setState(() {
         xp = data['xp'] ?? 0;
         level = data['level'] ?? 0;
         isLoading = false;
       });
     } else {
+      if (!mounted) return;
       setState(() => isLoading = false);
     }
   }
@@ -83,7 +85,7 @@ class _XPLevelBarState extends State<XPLevelBar> with RouteAware {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('루틴 XP   $xp', style: const TextStyle(fontSize: 16)),
-            Text('Lv.$level 갓생러', style: const TextStyle(color: Colors.lightBlue)),
+            Text('Lv.$level   ', style: const TextStyle(color: Colors.lightBlue)),
           ],
         ),
         const SizedBox(height: 6),

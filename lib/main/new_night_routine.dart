@@ -7,6 +7,8 @@ import '../custom/dialogs/recommend_night_routine_list.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'set_sleep_cycle.dart';
+import '../custom/dialogs/mine_night_routine_list_dialog.dart';
+
 
 class NewNightRoutineSheet extends StatefulWidget {
   final DateTime selectedDate;
@@ -342,13 +344,12 @@ class _NewNightRoutineSheetState extends State<NewNightRoutineSheet> {
               onPressed: () {
                 showDialog(
                   context: context,
-                  builder: (_) => RecommendRoutineList(
+                  builder: (_) => MineNightRoutineListDialog(
                     titleController: titleController,
                     onClose: () {
                       Navigator.of(context).pop();
                       setState(() {
                         isEditingTitle = false;
-                        routineCategory = 'recommend';
                       });
                     },
                   ),
