@@ -495,6 +495,93 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                   ],
                                 ),
                               ],
+                            );
+                          } else {
+                            return const SizedBox.shrink();
+                          }
+                        },
+                      ),
+
+                      // 텍스트 본문
+                      Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 좋아요
+                            StreamBuilder<DocumentSnapshot>(
+                              stream: boardDoc.snapshots(),
+                              builder: (context, boardSnapshot) {
+                                final boardData = boardSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+                                final likeCount = boardData['likeCount'] ?? 0;
+
+                                return StreamBuilder<DocumentSnapshot>(
+                                  stream: likeDoc.snapshots(),
+                                  builder: (context, snapshot) {
+                                    final isLiked = snapshot.data?.exists ?? false;
+
+                                    return Column(
+                                      children: [
+                                        IconButton(
+                                            icon: Icon(
+                                              isLiked ? Icons.favorite : Icons.favorite_border,
+                                              color: isLiked ? const Color(0xFFF45050) : Colors.grey,
+                                            ),
+                                            onPressed: () async {
+                                              if (isLiked) {
+                                                // 좋아요 취소
+                                                await likeDoc.delete();
+                                                await boardDoc.update({'likeCount': FieldValue.increment(-1)});
+                                              } else { // 나중에 여기에 좋아요 누르기 미션 수행 카운트 늘리기
+                                                // 좋아요 추가
+                                                await likeDoc.set({'likedAt': FieldValue.serverTimestamp()});
+                                                await boardDoc.update({'likeCount': FieldValue.increment(1)});
+
+                                                // 알림 보내기 전에 알림 설정 확인
+                                                final receiverUid = post['userId'];
+                                                final currentUser = FirebaseAuth.instance.currentUser;
+                                                if (currentUser != null && receiverUid != currentUser.uid) {
+                                                  final notiSettingSnap = await FirebaseFirestore.instance
+                                                      .collection('users')
+                                                      .doc(receiverUid)
+                                                      .collection('notiSettings')
+                                                      .doc('main')
+                                                      .get();
+
+                                                  final notiSettings = notiSettingSnap.data();
+                                                  final isLikeEnabled = notiSettings?['like'] ?? false;
+
+                                                  if (isLikeEnabled) {
+                                                    // Firestore에서 내 닉네임 불러오기
+                                                    final userDoc = await FirebaseFirestore.instance
+                                                        .collection('users')
+                                                        .doc(currentUser.uid)
+                                                        .get();
+
+                                                    final nickName = userDoc.data()?['nickName'] ?? '익명';
+
+                                                    await FirebaseFirestore.instance
+                                                        .collection('users')
+                                                        .doc(receiverUid)
+                                                        .collection('notifications')
+                                                        .add({
+                                                      'notiType': 'like',
+                                                      'notiMsg': '$nickName님이 게시글을 좋아합니다.',
+                                                      'boardId': post['boardId'],
+                                                      'createdAt': FieldValue.serverTimestamp(),
+                                                      'isRead': false,
+                                                    });
+                                                  }
+                                                }
+                                              }
+                                            }
+                                        ),
+                                        Text('$likeCount', style: const TextStyle(fontSize: 12)),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
                             ),
                           ),
 

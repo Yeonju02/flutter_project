@@ -155,7 +155,7 @@ class _SetSleepCyclePageState extends State<SetSleepCyclePage> {
               ),
               const SizedBox(height: 8),
               const Text(
-                '예상 수면 주기 추천 시간',
+                '기상 시간에 따라 취침 시간을 추천해드려요',
                 style: TextStyle(fontSize: 14, color: Colors.white60),
               ),
               const SizedBox(height: 20),

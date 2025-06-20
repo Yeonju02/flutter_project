@@ -59,7 +59,6 @@ dependencies:
   roulette:
   vector_math: ^2.1.4
   fl_chart: ^0.64.0
-
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
 
@@ -106,6 +105,8 @@ flutter:
     - assets/point_box.png
     - assets/used_point_box.png
     - assets/board/
+    - assets/arrow_icon.png
+    
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

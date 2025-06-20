@@ -5,6 +5,7 @@ import '../custom/custom_blue_button.dart';
 import '../custom/dialogs/recommend_routine_list.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../custom/dialogs/mine_routine_list_dialog.dart';
 
 class NewRoutineSheet extends StatefulWidget {
   final DateTime selectedDate;
@@ -340,7 +341,18 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
               ),
               TextButton(
                 onPressed: () {
-                  // 나만의 루틴 가져오기
+                  showDialog(
+                    context: context,
+                    builder: (_) => MineRoutineListDialog(
+                      titleController: titleController,
+                      onClose: () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          isEditingTitle = false;
+                        });
+                      },
+                    ),
+                  );
                 },
                 child: const Text(
                   '나만의 루틴 가져오기',
