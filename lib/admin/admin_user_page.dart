@@ -47,7 +47,7 @@ class _UserAdminPageState extends State<UserAdminPage> {
         backgroundColor: const Color(0xFF819CFF),
         title: Row(
           children: [
-            Image.asset('assets/logo.png', height: 28),
+            Image.asset('assets/admin_logo.png', height: 28),
             const Spacer(),
             GestureDetector(
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MainPage())),

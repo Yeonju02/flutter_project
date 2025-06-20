@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:routinelogapp/shop/roulette_page.dart';
 import '../board/board_main_screen.dart';
 import '../main/main_page.dart';
 import '../mypage/myPage_main.dart';
@@ -67,12 +66,6 @@ class _ShopMainPageState extends State<ShopMainPage> {
         children: [
           Column(
             children: [
-              TextButton(
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => AnimatedRoulettePage(),));
-                  }, 
-                  child: Text("룰렛")
-              ),
               // 검색창
               Padding(
                 padding: const EdgeInsets.all(10),
@@ -199,10 +192,8 @@ class _ShopMainPageState extends State<ShopMainPage> {
 
                     final allProducts = snapshot.data!.docs;
 
-                    // 👉 필터링된 상품 리스트 임시 저장 (각 데이터에 productId 포함)
                     final filtered = allProducts.where((doc) {
                       final data = doc.data() as Map<String, dynamic>;
-                      data['productId'] = doc.id; // 🔸 문서 ID 추가
                       final name = data['productName']?.toString() ?? '';
                       final category = data['productCategory'] ?? {};
                       final main = category['main'] ?? '';
@@ -215,13 +206,13 @@ class _ShopMainPageState extends State<ShopMainPage> {
                       return matchesMain && matchesSub && matchesSearch;
                     }).map((doc) {
                       final data = doc.data() as Map<String, dynamic>;
+                      // ✅ 여기서 productId 포함해서 새 map 리턴
                       return {
                         ...data,
                         'productId': doc.id,
                       };
                     }).toList();
 
-                    // ✅ 최초 한 번만 표시하거나 로딩이 끝난 후 교체
                     if (!_isLoading) {
                       _displayedProducts = filtered;
                     }
@@ -273,8 +264,6 @@ class _ShopMainPageState extends State<ShopMainPage> {
                 });
 
                 switch (index) {
-                  case 0:
-                    break; // 현재 페이지
                   case 1:
                     Navigator.pushReplacement(context,
                         MaterialPageRoute(builder: (context) => BoardMainScreen()));

@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'dart:math';
+
 import '../custom/admin_bottom_bar.dart';
 import '../main/main_page.dart';
 import 'admin_board_page.dart';
@@ -15,79 +18,169 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
-  final List<String> _last6Months = [];
-  final Map<String, int> _monthlySales = {};
-  final Map<String, int> _monthlySignups = {};
-  int _totalSales = 0;
-  int _totalSignups = 0;
-  bool _loading = true;
+  int todaySales = 0;
+  int totalSales = 0;
+  int newUsersToday = 0;
+
+  List<FlSpot> salesSpots = [];
+  List<FlSpot> userSpots = [];
 
   @override
   void initState() {
     super.initState();
-    _prepareDateLabels();
-    _fetchDashboardData();
+    _loadDashboardData();
   }
 
-  void _prepareDateLabels() {
+  Future<void> _loadDashboardData() async {
     final now = DateTime.now();
+    final formatter = DateFormat('yyyy-MM-dd');
+    final monthFormatter = DateFormat('yyyy-MM');
+    final todayStr = formatter.format(now);
+
+    final ordersSnapshot = await FirebaseFirestore.instance.collectionGroup('orders').get();
+    final usersSnapshot = await FirebaseFirestore.instance.collection('users').get();
+
+    int todayTotal = 0;
+    int allTotal = 0;
+    int todayNew = 0;
+
+    Map<String, double> monthlySalesMap = {};
+    Map<String, int> monthlyUserMap = {};
+
     for (int i = 5; i >= 0; i--) {
-      final date = DateTime(now.year, now.month - i, 1);
-      final label = "${date.year}-${date.month.toString().padLeft(2, '0')}";
-      _last6Months.add(label);
-      _monthlySales[label] = 0;
-      _monthlySignups[label] = 0;
+      final month = DateTime(now.year, now.month - i, 1);
+      final label = monthFormatter.format(month);
+      monthlySalesMap[label] = 0;
+      monthlyUserMap[label] = 0;
     }
-  }
 
-  Future<void> _fetchDashboardData() async {
-    try {
-      // 가입자 수
-      final userSnapshot = await FirebaseFirestore.instance.collection('users').get();
-      _totalSignups = userSnapshot.size;
-      for (var doc in userSnapshot.docs) {
-        final data = doc.data();
-        final ts = data['joinedAt'];
-        if (ts is Timestamp) {
-          final date = ts.toDate();
-          final label = "${date.year}-${date.month.toString().padLeft(2, '0')}";
-          if (_monthlySignups.containsKey(label)) {
-            _monthlySignups[label] = _monthlySignups[label]! + 1;
-          }
+    for (var order in ordersSnapshot.docs) {
+      final data = order.data() as Map<String, dynamic>;
+      final ts = (data['createdAt'] as Timestamp?)?.toDate();
+      final price = (data['productPrice'] as int?) ?? 0;
+      allTotal += price;
+
+      if (ts != null) {
+        final orderMonth = monthFormatter.format(ts);
+        if (monthlySalesMap.containsKey(orderMonth)) {
+          monthlySalesMap[orderMonth] = (monthlySalesMap[orderMonth] ?? 0) + price;
+        }
+        if (formatter.format(ts) == todayStr) {
+          todayTotal += price;
         }
       }
+    }
 
-      // 매출
-      int salesSum = 0;
-      for (var userDoc in userSnapshot.docs) {
-        final orders = await userDoc.reference.collection('orders').get();
-        for (var order in orders.docs) {
-          final price = order['productPrice'] ?? 0;
-          final ts = order['createdAt'];
-          if (ts is Timestamp) {
-            final date = ts.toDate();
-            final label = "${date.year}-${date.month.toString().padLeft(2, '0')}";
-            if (_monthlySales.containsKey(label)) {
-              if (price is int) {
-                _monthlySales[label] = (_monthlySales[label] ?? 0) + price;
-                salesSum += price;
-              }
-            }
-          }
+    for (var user in usersSnapshot.docs) {
+      final data = user.data() as Map<String, dynamic>;
+      final ts = (data['joinedAt'] as Timestamp?)?.toDate();
+      if (ts != null) {
+        final userMonth = monthFormatter.format(ts);
+        if (monthlyUserMap.containsKey(userMonth)) {
+          monthlyUserMap[userMonth] = (monthlyUserMap[userMonth] ?? 0) + 1;
+        }
+        if (formatter.format(ts) == todayStr) {
+          todayNew++;
         }
       }
-      _totalSales = salesSum;
-    } catch (e) {
-      print('Dashboard 데이터 로딩 오류: $e');
     }
+
+    final salesSpotsList = monthlySalesMap.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+    final userSpotsList = monthlyUserMap.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
 
     setState(() {
-      _loading = false;
+      todaySales = todayTotal;
+      totalSales = allTotal;
+      newUsersToday = todayNew;
+
+      salesSpots = List.generate(
+        salesSpotsList.length,
+            (i) => FlSpot(i.toDouble(), salesSpotsList[i].value),
+      );
+
+      userSpots = List.generate(
+        userSpotsList.length,
+            (i) => FlSpot(i.toDouble(), max(0, userSpotsList[i].value.toDouble())),
+      );
     });
+  }
+
+  Widget _buildSummaryCard(String title, String value) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 5),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F4FA),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLineChart(String title, List<FlSpot> data) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F4FA),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      height: 200,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          Expanded(
+            child: LineChart(LineChartData(
+              minY: 0,
+              lineBarsData: [
+                LineChartBarData(
+                  spots: data,
+                  isCurved: false,
+                  barWidth: 3,
+                  color: const Color(0xFF819CFF),
+                ),
+              ],
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 40,
+                    interval: _getYAxisInterval(data),
+                    getTitlesWidget: (value, meta) {
+                      return Text(
+                        _formatYAxisLabel(value),
+                        style: const TextStyle(fontSize: 10),
+                      );
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              gridData: FlGridData(show: true, horizontalInterval: _getYAxisInterval(data)),
+            )),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final formatter = NumberFormat('#,###');
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -95,7 +188,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         backgroundColor: const Color(0xFF819CFF),
         title: Row(
           children: [
-            Image.asset('assets/logo.png', height: 28),
+            Image.asset('assets/admin_logo.png', height: 28),
             const Spacer(),
             GestureDetector(
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MainPage())),
@@ -104,21 +197,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ],
         ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _buildStatText('누적 총 매출액', _formatCurrency(_totalSales)),
-            const SizedBox(height: 6),
-            SizedBox(height: 150, child: _buildSalesChart()),
-
-            const SizedBox(height: 24),
-
-            _buildStatText('누적 가입자 수', '$_totalSignups명'),
-            const SizedBox(height: 6),
-            SizedBox(height: 150, child: _buildSignupChart()),
+            Row(
+              children: [
+                _buildSummaryCard('오늘 매출', '${formatter.format(todaySales)}원'),
+                _buildSummaryCard('총 매출', '${formatter.format(totalSales)}원'),
+                _buildSummaryCard('신규 가입자', '$newUsersToday명'),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildLineChart('최근 6개월 매출 추이', salesSpots),
+            _buildLineChart('최근 6개월 가입자 추이', userSpots),
           ],
         ),
       ),
@@ -130,6 +222,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const UserAdminPage()));
               break;
             case 1:
+            // 현재 페이지
               break;
             case 2:
               Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminBoardPage()));
@@ -142,88 +235,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       ),
     );
   }
+}
 
-  Widget _buildStatText(String title, String value) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontSize: 14)),
-          const SizedBox(height: 2),
-          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
+double _getYAxisInterval(List<FlSpot> data) {
+  final maxValue = data.map((e) => e.y).fold(0.0, max);
+  if (maxValue <= 10) return 2;
+  if (maxValue <= 100) return 10;
+  if (maxValue <= 1000) return 100;
+  return 500;
+}
 
-  Widget _buildSalesChart() {
-    return BarChart(
-      BarChartData(
-        barGroups: _last6Months.asMap().entries.map((e) {
-          final index = e.key;
-          final label = e.value;
-          return BarChartGroupData(
-            x: index,
-            barRods: [
-              BarChartRodData(
-                toY: (_monthlySales[label] ?? 0) / 10000, // 1만 단위로 줄임
-                width: 16,
-                color: const Color(0xFF819CFF),
-              ),
-            ],
-          );
-        }).toList(),
-        titlesData: FlTitlesData(
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, _) => Text(_last6Months[value.toInt()].substring(5)),
-            ),
-          ),
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true)),
-        ),
-        gridData: FlGridData(show: true),
-        borderData: FlBorderData(show: false),
-      ),
-    );
-  }
-
-  Widget _buildSignupChart() {
-    return LineChart(
-      LineChartData(
-        lineBarsData: [
-          LineChartBarData(
-            spots: _last6Months.asMap().entries.map((e) {
-              final index = e.key;
-              final label = e.value;
-              return FlSpot(index.toDouble(), (_monthlySignups[label] ?? 0).toDouble());
-            }).toList(),
-            color: const Color(0xFF92BBE2),
-            isCurved: true,
-            barWidth: 4,
-            belowBarData: BarAreaData(
-              show: true,
-              color: const Color(0xFF92BBE2).withOpacity(0.3),
-            ),
-          ),
-        ],
-        titlesData: FlTitlesData(
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, _) => Text(_last6Months[value.toInt()].substring(5)),
-            ),
-          ),
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true)),
-        ),
-        borderData: FlBorderData(show: false),
-        gridData: FlGridData(show: true),
-      ),
-    );
-  }
-
-  String _formatCurrency(int number) {
-    return '₩' + number.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',');
+String _formatYAxisLabel(double value) {
+  if (value >= 10000) {
+    return '${(value / 10000).toStringAsFixed(1)}만';
+  } else if (value >= 1000) {
+    return '${(value / 1000).toStringAsFixed(0)}k';
+  } else {
+    return value.toInt().toString();
   }
 }

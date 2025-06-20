@@ -67,11 +67,26 @@ class _MainAppState extends State<MainApp> {
             duration: const Duration(milliseconds: 800),
             onEnd: _onFadeComplete,
             child: Center(
-              child: Image.asset(
-                'assets/logo.png',
-                width: 200,
-                height: 200,
-                fit: BoxFit.contain,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/logo.png',
+                    width: 150,
+                    height: 150,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 30),
+                  const Text(
+                    '하루의 시작과 끝, 루틴으로 완성하다',
+                    style: TextStyle(
+                      fontSize: 25,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           ),

@@ -12,7 +12,20 @@
           "package_name": "com.routinelog.routinelogapp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "970326676300-1dd9tmm02e2106m7m9vv86d623v2pbuv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.routinelog.routinelogapp",
+            "certificate_hash": "ce0f8b05d03c3783e4dd57542f826d0bd71daa27"
+          }
+        },
+        {
+          "client_id": "970326676300-q2fnhrff602jc21oigerq6in3l06pr1j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCrjJyuCSZ6-fdxl5jBGCUKA_mn_0-sMCg"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "970326676300-q2fnhrff602jc21oigerq6in3l06pr1j.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "970326676300-7rj3eifghp3v65porbakma7pc7gchq00.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.routinelog.routinelogapp"
+              }
+            }
+          ]
         }
       }
     }
