@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:routinelogapp/board/board_write_screen.dart';
 import 'package:routinelogapp/board/comment_input_bar.dart';
 import 'package:routinelogapp/board/comment_list.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
@@ -116,18 +117,22 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   void _showPostOptions(BuildContext context, String boardId) async {
     final selected = await showModalBottomSheet<String>(
       context: context,
+      backgroundColor: const Color(0xFF92BBE2),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.edit),
-              title: const Text('수정'),
+              leading: const Icon(Icons.edit, color: Colors.white),
+              title: const Text('수정', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context, 'edit'),
             ),
             ListTile(
-              leading: const Icon(Icons.delete),
-              title: const Text('삭제'),
+              leading: const Icon(Icons.delete, color: Colors.white),
+              title: const Text('삭제', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context, 'delete'),
             ),
           ],
@@ -136,7 +141,20 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     );
 
     if (selected == 'edit') {
-      // 수정 로직 연결
+      final doc = await FirebaseFirestore.instance.collection('boards').doc(boardId).get();
+      final postData = doc.data();
+
+      if (postData != null && context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BoardWriteScreen(
+              boardId: boardId,
+              post: postData,
+            ),
+          ),
+        );
+      }
     } else if (selected == 'delete') {
       await FirebaseFirestore.instance.collection('boards').doc(boardId).delete();
       if (mounted) Navigator.pop(context);
