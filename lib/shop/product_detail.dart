@@ -313,7 +313,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                             : '날짜 없음';
 
                         final score = review['score'] ?? 0;
-                        final List<dynamic>? reviewImgs = review['reviewImg'] as List?;
+                        final List<dynamic>? reviewImgs = review['images'] as List?;
 
                         return FutureBuilder<String>(
                           future: getMaskedUserId(reviewDocId),

@@ -45,12 +45,6 @@ class _AddProductPageState extends State<AddProductPage> {
 
   Future<void> _submitProduct() async {
     if (!_formKey.currentState!.validate()) return;
-    if (colorVariants.any((variant) => variant['image'] == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("각 색상에 이미지가 필요합니다.")),
-      );
-      return;
-    }
 
     setState(() {
       isUploading = true;
@@ -60,10 +54,12 @@ class _AddProductPageState extends State<AddProductPage> {
       List<Map<String, dynamic>> colorList = [];
 
       for (final variant in colorVariants) {
+        String? imgUrl;
+
         final uuid = const Uuid().v4();
         final ref = FirebaseStorage.instance.ref().child('product_images/$uuid.jpg');
         await ref.putFile(File(variant['image'].path));
-        final imgUrl = await ref.getDownloadURL();
+        imgUrl = await ref.getDownloadURL();
 
         colorList.add({
           'color': variant['color'].text.trim(),
@@ -152,6 +148,7 @@ class _AddProductPageState extends State<AddProductPage> {
                 controller: descController,
                 decoration: _inputDecoration('상품 설명을 입력하세요'),
                 validator: (value) => value!.isEmpty ? '상품 설명을 입력하세요' : null,
+                maxLines: 6,
               ),
               const SizedBox(height: 12),
 

@@ -74,7 +74,7 @@ class _AdminProductPageState extends State<AdminProductPage> {
         backgroundColor: const Color(0xFF819CFF),
         title: Row(
           children: [
-            Image.asset('assets/logo.png', height: 28),
+            Image.asset('assets/admin_logo.png', height: 28),
             const Spacer(),
             GestureDetector(
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MainPage())),
@@ -168,7 +168,13 @@ class _AdminProductPageState extends State<AdminProductPage> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AddProductPage()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AddProductPage()),
+                      ).then((_) {
+                        // 돌아오고 나서 상품 다시 불러오기
+                        _fetchProducts();
+                      });
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFA5C8F8),
@@ -189,9 +195,10 @@ class _AdminProductPageState extends State<AdminProductPage> {
               ),
               child: const Row(
                 children: [
+                  SizedBox(width: 30),
                   Expanded(flex: 4, child: Text('상품명', style: TextStyle(fontWeight: FontWeight.bold))),
-                  Expanded(flex: 2, child: Text('가격', style: TextStyle(fontWeight: FontWeight.bold))),
-                  Expanded(flex: 2, child: Text('총 재고', style: TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(flex: 3, child: Text('가격', style: TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(flex: 3, child: Text('총 재고', style: TextStyle(fontWeight: FontWeight.bold))),
                 ],
               ),
             ),
@@ -230,16 +237,26 @@ class _AdminProductPageState extends State<AdminProductPage> {
                               else
                                 const Icon(Icons.image, size: 40),
                               const SizedBox(width: 8),
-                              Text(product['productName'] ?? ''),
+                              Expanded(
+                                child: Text(
+                                  product['productName'] ?? '',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
                             ],
                           ),
                         ),
                         Expanded(
                           flex: 2,
-                          child: Text('\₩${product['productPrice']}'),
+                          child: Text(
+                              '\₩${product['productPrice']}',
+                            textAlign: TextAlign.left,
+                            style: TextStyle(fontSize: 14),
+                          ),
                         ),
                         Expanded(
-                          flex: 2,
+                          flex: 3,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
@@ -251,7 +268,9 @@ class _AdminProductPageState extends State<AdminProductPage> {
                                     MaterialPageRoute(
                                       builder: (_) => EditProductPage(doc: doc),
                                     ),
-                                  );
+                                  ).then((_) {
+                                    _fetchProducts();
+                                  });
                                 },
                                 child: const Text('수정'),
                               ),

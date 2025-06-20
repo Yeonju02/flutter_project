@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../main/main_page.dart';
 import 'find_account_page.dart';
 import 'signup_page.dart';
-import 'dart:math';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -75,6 +75,61 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _handleGoogleLogin() async {
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) {
+        _showToast("구글 로그인이 취소되었습니다.");
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      UserCredential userCredential =
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      User? user = userCredential.user;
+
+      if (user != null) {
+        // Firestore에 사용자 정보 저장 (처음 로그인 시)
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .where('userEmail', isEqualTo: user.email)
+            .limit(1)
+            .get();
+
+        if (userDoc.docs.isEmpty) {
+          await FirebaseFirestore.instance.collection('users').add({
+            'userId': user.email!.split('@').first,
+            'userEmail': user.email,
+            'nickName': user.displayName ?? '사용자',
+            'imgPath': user.photoURL ?? '',
+            'joinedAt': Timestamp.now(),
+            'status': 'active',
+            'level': 'normal',
+          });
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userEmail', user.email ?? '');
+        await prefs.setString('userId', user.email!.split('@').first);
+
+        _showToast("구글 로그인 성공!");
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainPage()),
+        );
+      }
+    } catch (e) {
+      _showToast("구글 로그인 실패: ${e.toString()}");
+    }
+  }
+
+
   Widget _buildInputField(String hint, TextEditingController controller, {bool obscure = false}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -99,74 +154,87 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Routine-Log : 루틴로그',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top,
               ),
-              const SizedBox(height: 32),
-              _buildInputField('아이디', userIdController),
-              _buildInputField('비밀번호', passwordController, obscure: true),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _handleLogin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: buttonColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
+              child: IntrinsicHeight(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 40),
+                      Image.asset(
+                        'assets/logo2.png',
+                        height: 150,
+                      ),
+                      const SizedBox(height: 50),
+                      _buildInputField('아이디', userIdController),
+                      _buildInputField('비밀번호', passwordController, obscure: true),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: _handleLogin,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: buttonColor,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                          ),
+                          child: const Text('로그인', style: TextStyle(color: Colors.white, fontSize: 16)),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: const [
+                          Expanded(child: Divider(color: Colors.grey)),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8.0),
+                            child: Text('또는', style: TextStyle(color: Colors.grey)),
+                          ),
+                          Expanded(child: Divider(color: Colors.grey)),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      InkWell(
+                        onTap: _handleGoogleLogin,
+                        child: Image.asset(
+                          'assets/google_icon.png',
+                          height: 60,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => SignupPage()));
+                            },
+                            child: const Text("회원가입", style: TextStyle(color: Color(0xFF7EA9D2))),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const FindAccountPage()));
+                            },
+                            child: const Text('아이디/비밀번호 찾기', style: TextStyle(color: Color(0xFF7EA9D2))),
+                          ),
+                          const Text('문의하기', style: TextStyle(color: Color(0xFF7EA9D2))),
+                        ],
+                      ),
+                      const SizedBox(height: 40),
+                    ],
                   ),
-                  child: const Text('로그인하기', style: TextStyle(color: Colors.white, fontSize: 16)),
                 ),
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: const [
-                  Expanded(child: Divider(color: Colors.grey)),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Text('SNS 계정으로 로그인', style: TextStyle(color: Colors.grey)),
-                  ),
-                  Expanded(child: Divider(color: Colors.grey)),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Center(
-                child: InkWell(
-                  onTap: () => _showToast("구글 로그인 클릭됨"),
-                  child: Image.asset(
-                    'assets/google_icon.png',
-                    height: 40,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => SignupPage()));
-                    },
-                    child: const Text("회원가입", style: TextStyle(color: Color(0xFF7EA9D2))),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const FindAccountPage()));
-                    },
-                    child: const Text('아이디/비밀번호 찾기', style: TextStyle(color: Color(0xFF7EA9D2))),
-                  ),
-                  const Text('문의하기', style: TextStyle(color: Color(0xFF7EA9D2))),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),

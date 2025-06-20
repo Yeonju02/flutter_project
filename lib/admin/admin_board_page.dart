@@ -114,7 +114,7 @@ class _AdminBoardPageState extends State<AdminBoardPage> {
         backgroundColor: mainColor,
         title: Row(
           children: [
-            Image.asset('assets/logo.png', height: 28),
+            Image.asset('assets/admin_logo.png', height: 28),
             const Spacer(),
             GestureDetector(
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MainPage())),
