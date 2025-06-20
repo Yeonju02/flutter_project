@@ -154,7 +154,6 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
   }
 
   void toggleCheck(int index) async {
-
     final item = routineList[index];
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -215,6 +214,57 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
       'xpEarned': earnedXP,
     });
 
+    // 추천 루틴이면 미션 카운트 올림
+    if (willBeChecked && item['routineCategory'] == 'recommend') {
+      final missionQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userDocId)
+          .collection('missions')
+          .where('missionTitle', isEqualTo: '아침 & 밤 추천 루틴 중 하나 수행하기')
+          .limit(1)
+          .get();
+
+      if (missionQuery.docs.isNotEmpty) {
+        final missionDoc = missionQuery.docs.first;
+        final data = missionDoc.data();
+        final current = (data['recentCount'] ?? 0).toInt();
+        final max = (data['maxCount'] ?? 1).toInt();
+
+        if (current < max) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userDocId)
+              .collection('missions')
+              .doc(missionDoc.id)
+              .update({'recentCount': current + 1});
+        }
+      }
+      final allMissionQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userDocId)
+          .collection('missions')
+          .where('missionTitle', isEqualTo: '모든 미션 완료하기')
+          .limit(1)
+          .get();
+
+      if (allMissionQuery.docs.isNotEmpty) {
+        final allMissionDoc = allMissionQuery.docs.first;
+        final allData = allMissionDoc.data();
+        final allCurrent = (allData['recentCount'] ?? 0).toInt();
+        final allMax = (allData['maxCount'] ?? 1).toInt();
+
+        if (allCurrent < allMax) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userDocId)
+              .collection('missions')
+              .doc(allMissionDoc.id)
+              .update({'recentCount': allCurrent + 1});
+        }
+      }
+    }
+
+
     if (willBeChecked && earnedXP > 0) {
       Future.delayed(const Duration(milliseconds: 300), () {
         showDialog(
@@ -224,12 +274,13 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
             currentLevel: userLevel,
             currentXP: userXP,
             earnedXP: earnedXP,
-              userDocId: userDocId!
+            userDocId: userDocId!,
           ),
         );
       });
     }
   }
+
 
 
 

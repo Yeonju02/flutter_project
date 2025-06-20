@@ -9,6 +9,8 @@ import '../shop/shop_main.dart';
 import '../mypage/myPage_main.dart';
 import 'routine_detail.dart';
 import '../utils/lib/route_observer.dart';
+import '../custom/daily_mission_tab.dart';
+
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -20,8 +22,9 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> with RouteAware {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  Key _calendarRefreshKey = UniqueKey();
+  Key _calendarRefreshKey = UniqueKey(); // 달력 새로고침용
   Key _xpBarKey = UniqueKey(); // 경험치바 새로고침용
+  Key _dailyMissionKey = UniqueKey(); // 일일미션 탭 새로고침용
 
   @override
   void didChangeDependencies() {
@@ -40,6 +43,7 @@ class _MainPageState extends State<MainPage> with RouteAware {
     setState(() {
       _calendarRefreshKey = UniqueKey();
       _xpBarKey = UniqueKey();
+      _dailyMissionKey = UniqueKey();
     });
   }
 
@@ -66,7 +70,13 @@ class _MainPageState extends State<MainPage> with RouteAware {
               padding: const EdgeInsets.only(bottom: 90),
               child: Column(
                 children: [
-
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: DailyMissionTab(
+                      key: _dailyMissionKey,
+                    ),
+                  ),
                   const SizedBox(height: 20),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

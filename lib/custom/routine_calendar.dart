@@ -133,28 +133,37 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
         ),
         const Divider(thickness: 2, color: Colors.grey),
         const SizedBox(height: 8),
-        ...events.map((event) {
-          final isNight = event['type'] == 'night';
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.circle,
-                  size: 10,
-                  color: isNight ? const Color(0xFFFFC107) : Colors.lightBlue,
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.only(bottom: 16),
+            itemCount: events.length,
+            itemBuilder: (context, index) {
+              final event = events[index];
+              final isNight = event['type'] == 'night';
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      size: 10,
+                      color: isNight ? const Color(0xFFFFC107) : Colors.lightBlue,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        event['title'] ?? '',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 14),
-                Text(
-                  event['title'] ?? '',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          );
-        }),
+              );
+            },
+          ),
+        ),
       ],
     );
   }
