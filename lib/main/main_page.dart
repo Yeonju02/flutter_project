@@ -10,6 +10,8 @@ import '../mypage/myPage_main.dart';
 import 'routine_detail.dart';
 import '../utils/lib/route_observer.dart';
 import '../custom/daily_mission_tab.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 
 class MainPage extends StatefulWidget {
@@ -30,7 +32,9 @@ class _MainPageState extends State<MainPage> with RouteAware {
   void didChangeDependencies() {
     super.didChangeDependencies();
     routeObserver.subscribe(this, ModalRoute.of(context)!);
+    _updateFcmToken(); // fcm 토큰으로 알림주기용
   }
+
 
   @override
   void dispose() {
@@ -58,6 +62,31 @@ class _MainPageState extends State<MainPage> with RouteAware {
       _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
     });
   }
+
+  Future<void> _updateFcmToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
+    if (userId == null) return;
+
+    final fcmToken = await FirebaseMessaging.instance.getToken();
+    if (fcmToken == null) return;
+
+    // userId 필드로 해당 유저의 문서 id 찾기
+    final query = await FirebaseFirestore.instance
+        .collection('users')
+        .where('userId', isEqualTo: userId)
+        .limit(1)
+        .get();
+
+    if (query.docs.isNotEmpty) {
+      final docId = query.docs.first.id;
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(docId)
+          .update({'fcmToken': fcmToken});
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {

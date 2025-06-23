@@ -584,6 +584,57 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                                       'likeCount': FieldValue.increment(1)
                                                     });
 
+                                                    // 좋아요 관련 로직
+                                                    final missionQuery = await FirebaseFirestore.instance
+                                                        .collection('users')
+                                                        .doc(userId)
+                                                        .collection('missions')
+                                                        .where('missionTitle', isEqualTo: '게시글에 좋아요 3번 남기기')
+                                                        .limit(1)
+                                                        .get();
+
+                                                    if (missionQuery.docs.isNotEmpty) {
+                                                      final missionDoc = missionQuery.docs.first;
+                                                      final missionData = missionDoc.data();
+                                                      final current = (missionData['recentCount'] ?? 0).toInt();
+                                                      final max = (missionData['maxCount'] ?? 3).toInt();
+
+                                                      if (current < max) {
+                                                        await FirebaseFirestore.instance
+                                                            .collection('users')
+                                                            .doc(userId)
+                                                            .collection('missions')
+                                                            .doc(missionDoc.id)
+                                                            .update({'recentCount': current + 1});
+
+                                                        if (current + 1 == max) {
+                                                          final allMissionQuery = await FirebaseFirestore.instance
+                                                              .collection('users')
+                                                              .doc(userId)
+                                                              .collection('missions')
+                                                              .where('missionTitle', isEqualTo: '모든 미션 완료하기')
+                                                              .limit(1)
+                                                              .get();
+
+                                                          if (allMissionQuery.docs.isNotEmpty) {
+                                                            final allDoc = allMissionQuery.docs.first;
+                                                            final allData = allDoc.data();
+                                                            final allCurrent = (allData['recentCount'] ?? 0).toInt();
+                                                            final allMax = (allData['maxCount'] ?? 1).toInt();
+
+                                                            if (allCurrent < allMax) {
+                                                              await FirebaseFirestore.instance
+                                                                  .collection('users')
+                                                                  .doc(userId)
+                                                                  .collection('missions')
+                                                                  .doc(allDoc.id)
+                                                                  .update({'recentCount': allCurrent + 1});
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+
                                                     final receiverUid = post['userId'];
                                                     if (userId != receiverUid) {
                                                       final notiSettingSnap =
