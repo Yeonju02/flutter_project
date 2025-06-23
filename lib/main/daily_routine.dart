@@ -189,7 +189,24 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
       baseXP = (baseXP + baseXP * bonusRate).round();
     }
 
-    final earnedXP = baseXP;
+    int earnedXP = baseXP;
+
+
+    if (willBeChecked && earnedXP > 0) {
+      final successQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userDocId)
+          .collection('routineLogs')
+          .where('date', isEqualTo: DateFormat('yyyy-MM-dd').format(today))
+          .where('isFinished', isEqualTo: true)
+          .where('xpEarned', isGreaterThan: 0)
+          .get();
+
+      // 경험치 5번 먹었는지 확인하고 제한
+      if (successQuery.docs.length >= 5) {
+        earnedXP = 1;
+      }
+    }
 
     setState(() {
       isCheckedList[index] = willBeChecked;
@@ -214,7 +231,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
       'xpEarned': earnedXP,
     });
 
-    // 추천 루틴이면 미션 카운트 올림
+    // 추천 루틴 미션 처리
     if (willBeChecked && item['routineCategory'] == 'recommend') {
       final missionQuery = await FirebaseFirestore.instance
           .collection('users')
@@ -239,6 +256,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
               .update({'recentCount': current + 1});
         }
       }
+
       final allMissionQuery = await FirebaseFirestore.instance
           .collection('users')
           .doc(userDocId)
@@ -264,7 +282,6 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
       }
     }
 
-
     if (willBeChecked && earnedXP > 0) {
       Future.delayed(const Duration(milliseconds: 300), () {
         showDialog(
@@ -280,6 +297,7 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
       });
     }
   }
+
 
 
 

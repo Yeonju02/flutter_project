@@ -6,6 +6,8 @@ import '../custom/dialogs/recommend_routine_list.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../custom/dialogs/mine_routine_list_dialog.dart';
+import '../custom/dialogs/custom_alert_dialog.dart';
+
 
 class NewRoutineSheet extends StatefulWidget {
   final DateTime selectedDate;
@@ -114,7 +116,6 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
             ),
           ),
 
-          // 제목 입력 영역
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -372,8 +373,7 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
             text: '루틴 추가하기',
             onPressed: () async {
               setState(() {
-                showTimeOrderError =
-                !_isStartTimeBeforeEndTime(startTime, endTime);
+                showTimeOrderError = !_isStartTimeBeforeEndTime(startTime, endTime);
               });
               if (showTimeOrderError) return;
 
@@ -403,11 +403,31 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
 
                 final userDocId = query.docs.first.id;
 
+                // 해당 날짜에 루틴 10개인지 체크하기
+                final existingQuery = await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(userDocId)
+                    .collection('routineLogs')
+                    .where('date', isEqualTo: DateFormat('yyyy-MM-dd').format(widget.selectedDate))
+                    .get();
+
+                if (existingQuery.docs.length >= 10) {
+                  if (context.mounted) {
+                    showDialog(
+                      context: context,
+                      builder: (_) => const CustomAlertDialog(
+                        title: '루틴 등록 제한!',
+                        description: '해당 날짜에는 루틴을 10개 이상 등록할 수 없습니다.',
+                      ),
+                    );
+                  }
+                  return;
+                }
+
                 final routineData = {
                   'title': titleController.text,
                   'routineType': 'morning',
-                  'date': DateFormat('yyyy-MM-dd')
-                      .format(widget.selectedDate),
+                  'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
                   'startTime': startTime.format(context),
                   'endTime': endTime.format(context),
                   'isFinished': false,

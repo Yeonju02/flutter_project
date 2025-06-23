@@ -8,6 +8,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'set_sleep_cycle.dart';
 import '../custom/dialogs/mine_night_routine_list_dialog.dart';
+import '../custom/dialogs/custom_night_alert_dialog.dart';
+
 
 
 class NewNightRoutineSheet extends StatefulWidget {
@@ -64,7 +66,7 @@ class _NewNightRoutineSheetState extends State<NewNightRoutineSheet> {
                 );
 
                 setState(() {
-                  //  cycle 모드일 경우 오전 시간 허용
+                  //  cycle 모드일 경우 오전 시간도 허용해주기
                   if (picked.hour < 12 && routineCategory != 'cycle') {
                     showInvalidNightTimeError = true;
                   } else {
@@ -404,7 +406,7 @@ class _NewNightRoutineSheetState extends State<NewNightRoutineSheet> {
               onPressed: () async {
                 setState(() {
                   if (routineCategory == 'cycle') {
-                    showTimeOrderError = false; // cycle인 경우 시간 순서 검사 안 함
+                    showTimeOrderError = false;
                   } else {
                     showTimeOrderError = !_isStartTimeBeforeEndTime(startTime, endTime);
                   }
@@ -425,11 +427,32 @@ class _NewNightRoutineSheetState extends State<NewNightRoutineSheet> {
                   if (query.docs.isEmpty) return;
 
                   final userDocId = query.docs.first.id;
+
+                  // 해당 날짜에 루틴 10개인지 체크하기
+                  final existingQuery = await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(userDocId)
+                      .collection('routineLogs')
+                      .where('date', isEqualTo: DateFormat('yyyy-MM-dd').format(widget.selectedDate))
+                      .get();
+
+                  if (existingQuery.docs.length >= 10) {
+                    if (context.mounted) {
+                      showDialog(
+                        context: context,
+                        builder: (_) => const CustomNightAlertDialog(
+                          title: '루틴 등록 제한!',
+                          description: '해당 날짜에는 루틴을 10개 이상 등록할 수 없습니다.',
+                        ),
+                      );
+                    }
+                    return;
+                  }
+
                   final routineData = {
                     'title': titleController.text,
                     'routineType': 'night',
-                    'date': DateFormat('yyyy-MM-dd')
-                        .format(widget.selectedDate),
+                    'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
                     'startTime': startTime.format(context),
                     'endTime': endTime.format(context),
                     'isFinished': false,
@@ -453,6 +476,7 @@ class _NewNightRoutineSheetState extends State<NewNightRoutineSheet> {
                 }
               },
             ),
+
             const SizedBox(height: 40),
           ],
         ),

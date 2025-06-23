@@ -179,8 +179,11 @@ class _NightRoutineEditDialogState extends State<NightRoutineEditDialog> {
     final isRecommend = widget.routineData['routineCategory'] == 'recommend';
 
     return Container(
-      color: const Color(0xFF182333),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      decoration: const BoxDecoration(
+        color: Color(0xFF182333),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,

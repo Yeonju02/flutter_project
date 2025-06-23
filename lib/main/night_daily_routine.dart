@@ -187,7 +187,23 @@ class _NightDailyRoutineState extends State<NightDailyRoutine> with TickerProvid
       baseXP = (baseXP + baseXP * bonusRate).round();
     }
 
-    final totalXp = baseXP;
+    int totalXp = baseXP;
+
+    // 경험치 5번 먹었는지 확인하고 제한
+    if (willBeChecked && totalXp > 0) {
+      final successQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userDocId)
+          .collection('routineLogs')
+          .where('date', isEqualTo: DateFormat('yyyy-MM-dd').format(today))
+          .where('isFinished', isEqualTo: true)
+          .where('xpEarned', isGreaterThan: 0)
+          .get();
+
+      if (successQuery.docs.length >= 5) {
+        totalXp = 1;
+      }
+    }
 
     setState(() {
       isCheckedList[index] = willBeChecked;
@@ -213,7 +229,6 @@ class _NightDailyRoutineState extends State<NightDailyRoutine> with TickerProvid
     });
 
     // 추천 루틴이면 미션 카운트 올림
-    // 추천 루틴이면 미션 카운트 올림
     if (willBeChecked && item['routineCategory'] == 'recommend') {
       final missionQuery = await FirebaseFirestore.instance
           .collection('users')
@@ -238,6 +253,7 @@ class _NightDailyRoutineState extends State<NightDailyRoutine> with TickerProvid
               .update({'recentCount': current + 1});
         }
       }
+
       final allMissionQuery = await FirebaseFirestore.instance
           .collection('users')
           .doc(userDocId)
@@ -263,7 +279,7 @@ class _NightDailyRoutineState extends State<NightDailyRoutine> with TickerProvid
       }
     }
 
-    // XP 다이얼로그 표시
+    // 경험치 다이얼로그 표시
     if (willBeChecked && totalXp > 0) {
       Future.delayed(const Duration(milliseconds: 300), () {
         showDialog(
