@@ -281,6 +281,7 @@ class _MyPageMainState extends State<MyPageMain> {
             ? (reviewData['createdAt'] as Timestamp).toDate()
             : null;
 
+        final reviewContent = reviewData['contents'];
 
         result.add({
           ...reviewData,
@@ -293,6 +294,7 @@ class _MyPageMainState extends State<MyPageMain> {
           'colors': colorsList,
           'description': productData['description'] ?? '',
           'reviewDate': reviewDate,
+          'reviewContent' : reviewContent,
         });
       }
     }
@@ -359,13 +361,6 @@ class _MyPageMainState extends State<MyPageMain> {
 
     return grouped;
   }
-
-
-
-
-
-
-
 
 
   // 내가 작성한 리뷰 삭제하기
@@ -671,7 +666,7 @@ class _MyPageMainState extends State<MyPageMain> {
 
   List<Map<String, dynamic>> myPosts = [];
 
-  
+
   // 내가 작성한 게시물 가져오기
   Future<void> fetchMyPosts() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -1863,7 +1858,7 @@ class _MyPageMainState extends State<MyPageMain> {
         final reviews = snapshot.data!;
         final groupedReviews = groupReviewsByDate(reviews);
         final sortedDates = groupedReviews.keys.toList()
-          ..sort((a, b) => b.compareTo(a)); // 최신 날짜부터 보여주기
+          ..sort((a, b) => b.compareTo(a)); // 최신 날짜부터
 
         return ListView.builder(
           itemCount: sortedDates.length,
@@ -1884,11 +1879,13 @@ class _MyPageMainState extends State<MyPageMain> {
                 ...reviewsForDate.map((review) {
                   final imageUrl = review['productImage'] ?? '';
                   final selectedColor = review['selectedColor'] ?? '';
-                  final reviewImages = (review['images'] ?? <String>[]) as List<dynamic>;
+                  final reviewImages =
+                  (review['images'] ?? <String>[]) as List<dynamic>;
 
                   return Card(
                     margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     color: Colors.white,
                     elevation: 2,
                     shadowColor: Colors.black.withOpacity(0.5),
@@ -1908,7 +1905,8 @@ class _MyPageMainState extends State<MyPageMain> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => ProductDetailPage(data: review),
+                                          builder: (context) =>
+                                              ProductDetailPage(data: review),
                                         ),
                                       );
                                     },
@@ -1918,43 +1916,52 @@ class _MyPageMainState extends State<MyPageMain> {
                                       width: 60,
                                       height: 60,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) =>
-                                          Icon(Icons.broken_image, size: 60),
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                          Icon(Icons.broken_image,
+                                              size: 60),
                                     )
-                                        : Icon(Icons.image_not_supported, size: 60),
+                                        : Icon(Icons.image_not_supported,
+                                        size: 60),
                                   ),
-                                  SizedBox(height: 8),
+                                  SizedBox(height: 10),
                                   Row(
                                     children: [
-                                      Icon(Icons.star, color: Colors.amber, size: 16),
+                                      Icon(Icons.star,
+                                          color: Colors.amber, size: 16),
                                       SizedBox(width: 4),
                                       Text(
                                         "${review['score']}",
-                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold),
                                       ),
                                     ],
                                   ),
                                 ],
                               ),
-                              SizedBox(width: 12),
+                              SizedBox(width: 10),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       review['productName'] ?? '',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     SizedBox(height: 4),
                                     Text(
                                       "${review['productPrice']}원",
-                                      style: TextStyle(color: Colors.grey[600]),
+                                      style:
+                                      TextStyle(color: Colors.grey[600]),
                                     ),
                                     if (selectedColor.isNotEmpty)
                                       Text(
                                         "선택한 옵션: $selectedColor",
-                                        style: TextStyle(color: Colors.grey[700]),
+                                        style: TextStyle(
+                                            color: Colors.grey[700]),
                                       ),
                                   ],
                                 ),
@@ -1962,13 +1969,15 @@ class _MyPageMainState extends State<MyPageMain> {
                               PopupMenuButton<String>(
                                 icon: Icon(Icons.more_vert),
                                 onSelected: (value) async {
-                                  final user = FirebaseAuth.instance.currentUser;
+                                  final user =
+                                      FirebaseAuth.instance.currentUser;
                                   if (user == null) return;
 
                                   final reviewDocId = review['orderId'] ?? '';
 
                                   if (value == 'edit') {
-                                    await showEditReviewDialog(context, review, reviewDocId, () {
+                                    await showEditReviewDialog(
+                                        context, review, reviewDocId, () {
                                       setState(() {});
                                     });
                                   } else if (value == 'delete') {
@@ -1976,33 +1985,58 @@ class _MyPageMainState extends State<MyPageMain> {
                                       context: context,
                                       builder: (context) => AlertDialog(
                                         title: Text('리뷰 삭제'),
-                                        content: Text('정말 이 리뷰를 삭제하시겠습니까?'),
+                                        content:
+                                        Text('정말 이 리뷰를 삭제하시겠습니까?'),
                                         actions: [
                                           TextButton(
-                                              onPressed: () => Navigator.pop(context, false),
+                                              onPressed: () =>
+                                                  Navigator.pop(context, false),
                                               child: Text('취소')),
                                           TextButton(
-                                              onPressed: () => Navigator.pop(context, true),
+                                              onPressed: () =>
+                                                  Navigator.pop(context, true),
                                               child: Text('삭제')),
                                         ],
                                       ),
                                     );
                                     if (confirmed == true) {
-                                      await deleteReview(review['productId'], reviewDocId);
+                                      await deleteReview(review['productId'],
+                                          reviewDocId);
                                       ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('리뷰가 삭제되었습니다.')));
+                                          SnackBar(
+                                              content:
+                                              Text('리뷰가 삭제되었습니다.')));
                                       setState(() {});
                                     }
                                   }
                                 },
                                 itemBuilder: (context) => [
-                                  PopupMenuItem(value: 'edit', child: Text('리뷰 수정')),
-                                  PopupMenuItem(value: 'delete', child: Text('리뷰 삭제')),
+                                  PopupMenuItem(
+                                      value: 'edit', child: Text('리뷰 수정')),
+                                  PopupMenuItem(
+                                      value: 'delete', child: Text('리뷰 삭제')),
                                 ],
                               ),
                             ],
                           ),
-                          SizedBox(height: 12),
+
+                          if ((review['reviewContent'] ?? '')
+                              .toString()
+                              .trim()
+                              .isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12.0),
+                              child: Text(
+                                review['reviewContent'],
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                          SizedBox(height: 10),
+
                           if (reviewImages.isNotEmpty)
                             SizedBox(
                               height: 100,
@@ -2010,9 +2044,11 @@ class _MyPageMainState extends State<MyPageMain> {
                                 scrollDirection: Axis.horizontal,
                                 itemCount: reviewImages.length,
                                 itemBuilder: (context, i) {
-                                  final imgUrl = reviewImages[i].toString();
+                                  final imgUrl =
+                                  reviewImages[i].toString();
                                   return Padding(
-                                    padding: const EdgeInsets.only(right: 8.0),
+                                    padding:
+                                    const EdgeInsets.only(right: 8.0),
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(8),
                                       child: Image.network(
@@ -2020,8 +2056,10 @@ class _MyPageMainState extends State<MyPageMain> {
                                         width: 100,
                                         height: 100,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) =>
-                                            Icon(Icons.broken_image, size: 100),
+                                        errorBuilder: (context, error,
+                                            stackTrace) =>
+                                            Icon(Icons.broken_image,
+                                                size: 100),
                                       ),
                                     ),
                                   );
@@ -2040,6 +2078,7 @@ class _MyPageMainState extends State<MyPageMain> {
       },
     );
   }
+
 
   // 주문 취소 다이얼로그
   void showCancelOrderDialog(BuildContext context, String documentId, VoidCallback onCancel) {
