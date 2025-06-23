@@ -7,12 +7,14 @@ class RoutineCalendar extends StatefulWidget {
   final DateTime focusedDay;
   final DateTime? selectedDay;
   final void Function(DateTime selectedDay, DateTime focusedDay) onDaySelected;
+  final void Function(DateTime)? onCalendarPageChanged;
 
   RoutineCalendar({
     super.key,
     required this.focusedDay,
     required this.selectedDay,
     required this.onDaySelected,
+    this.onCalendarPageChanged,
   });
 
   @override
@@ -30,6 +32,16 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
     _focusedDay = widget.focusedDay;
     _selectedDay = widget.selectedDay;
     _loadEvents();
+  }
+
+  @override
+  void didUpdateWidget(covariant RoutineCalendar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!isSameDay(oldWidget.focusedDay, widget.focusedDay)) {
+      setState(() {
+        _focusedDay = widget.focusedDay;
+      });
+    }
   }
 
   Future<void> _loadEvents() async {
@@ -59,7 +71,7 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
       final data = doc.data();
       final dateStr = data['date'];
       final title = data['title'];
-      final routineType = data['routineType']; // 'morning' or 'night'
+      final routineType = data['routineType'];
 
       if (dateStr != null && title != null && routineType != null) {
         final date = DateTime.parse(dateStr);
@@ -105,6 +117,14 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
           focusedDay: _focusedDay,
           selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
           onDaySelected: _handleDaySelected,
+          onPageChanged: (newFocusedDay) {
+            setState(() {
+              _focusedDay = newFocusedDay;
+            });
+            if (widget.onCalendarPageChanged != null) {
+              widget.onCalendarPageChanged!(newFocusedDay);
+            }
+          },
           eventLoader: _getEventsForDay,
           calendarStyle: const CalendarStyle(
             markerDecoration: BoxDecoration(
