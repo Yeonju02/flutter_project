@@ -90,25 +90,41 @@ class _PaymentPageState extends State<PaymentPage> {
   Future<void> _loadDefaultAddress() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('userId');
-
     if (userId == null) return;
 
-    final snapshot = await FirebaseFirestore.instance
+    // 'userId' 필드로 문서 ID 찾기
+    final userQuery = await FirebaseFirestore.instance
         .collection('users')
-        .doc(userId)
-        .collection('addresses')
+        .where('userId', isEqualTo: userId)
+        .limit(1)
+        .get();
+
+    if (userQuery.docs.isEmpty) {
+      debugPrint('❌ userId 일치하는 사용자 문서 없음');
+      return;
+    }
+
+    final userDocId = userQuery.docs.first.id;
+
+    final addressSnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userDocId)
+        .collection('address')
         .where('isDefault', isEqualTo: true)
         .limit(1)
         .get();
 
-    if (snapshot.docs.isNotEmpty) {
-      final data = snapshot.docs.first.data();
+    if (addressSnapshot.docs.isNotEmpty) {
+      final data = addressSnapshot.docs.first.data();
+      debugPrint("✅ 기본 배송지 불러오기 성공: ${data['address']}");
       setState(() {
         nameController.text = data['name'] ?? '';
         phoneController.text = data['phone'] ?? '';
         addressController.text = data['address'] ?? '';
         requestController.text = data['request'] ?? '';
       });
+    } else {
+      debugPrint('⚠️ 기본 배송지 없음');
     }
   }
 
@@ -252,11 +268,15 @@ class _PaymentPageState extends State<PaymentPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    // 배송지 관리로 이동
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => DeliveryAddressPage()),
                     );
+
+                    // 돌아왔을 때 최신 기본 배송지 다시 로딩
+                    await _loadDefaultAddress();
                   },
                   child: const Text('배송지 관리'),
                 ),

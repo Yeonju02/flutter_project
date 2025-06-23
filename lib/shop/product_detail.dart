@@ -475,7 +475,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
   }
 
-
   String _getColorLabel(String id) {
     switch (id.toLowerCase()) {
       case 'blue':
@@ -522,6 +521,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       case 'gray':
       case 'grey':
         return '그레이';
+      case 'skin':
+        return '살구';
+      case 'charcoal':
+        return '차콜';
       default:
         return id;
     }
@@ -575,6 +578,10 @@ Color _mapColorIdToColor(String id) {
     case 'gray':
     case 'grey':
       return Colors.grey;
+    case 'skin':
+      return Color(0xFFFFE0BD);
+    case 'charcoal':
+      return Color(0xFF36454F);
     default:
       return Colors.grey;
   }

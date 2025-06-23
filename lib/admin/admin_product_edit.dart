@@ -220,7 +220,10 @@ class _EditProductPageState extends State<EditProductPage> {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _saveProduct,
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFA5C8F8)),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF819CFF),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
                 child: const Text('저장하기', style: TextStyle(color: Colors.white),),
               ),
               TextButton(

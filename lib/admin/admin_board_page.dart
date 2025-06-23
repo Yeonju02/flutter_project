@@ -237,62 +237,65 @@ class _AdminBoardPageState extends State<AdminBoardPage> {
   Widget _buildFilterSection() {
     return Column(
       children: [
-        TextField(
-          decoration: InputDecoration(
-            labelText: '제목',
-            filled: true,
-            fillColor: const Color(0xFFF0F4FA),
-            border: borderStyle,
-            focusedBorder: borderStyle,
+        // 제목 검색창
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 6),
+          child: TextField(
+            onChanged: (value) => _title = value,
+            decoration: InputDecoration(
+              hintText: '제목 검색',
+              prefixIcon: const Icon(Icons.search, color: Color(0xFF92BBE2)),
+              filled: true,
+              fillColor: const Color(0xFFF7F8FA),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+            ),
           ),
-          onChanged: (value) => _title = value,
         ),
-        const SizedBox(height: 12),
+        // 작성자 + 타입
         Row(
           children: [
             Expanded(
-              child: TextField(
-                decoration: InputDecoration(
-                  labelText: '작성자',
-                  filled: true,
-                  fillColor: const Color(0xFFF0F4FA),
-                  border: borderStyle,
-                  focusedBorder: borderStyle,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: TextField(
+                  onChanged: (value) => _author = value,
+                  decoration: InputDecoration(
+                    hintText: '작성자 검색',
+                    prefixIcon: const Icon(Icons.person, color: Color(0xFF92BBE2)),
+                    filled: true,
+                    fillColor: const Color(0xFFF7F8FA),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                 ),
-                onChanged: (value) => _author = value,
               ),
             ),
-            const SizedBox(width: 12),
             Expanded(
               child: DropdownButtonFormField<String>(
                 value: _selectedType,
                 decoration: InputDecoration(
-                  labelText: '종류',
-                  labelStyle: TextStyle(color: mainColor, fontWeight: FontWeight.w500),
+                  hintText: '종류 선택',
                   filled: true,
-                  fillColor: const Color(0xFFF0F4FA),
-                  border: borderStyle,
-                  focusedBorder: borderStyle,
+                  fillColor: const Color(0xFFF7F8FA),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 dropdownColor: Colors.white,
                 elevation: 8,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.black,
-                  fontWeight: FontWeight.normal,
-                ),
-                iconEnabledColor: mainColor,
+                style: const TextStyle(fontSize: 14, color: Colors.black),
+                iconEnabledColor: const Color(0xFF819CFF),
                 items: _types.map(
                       (type) => DropdownMenuItem(
                     value: type,
-                    child: Text(
-                      type,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black,
-                      ),
-                    ),
+                    child: Text(type),
                   ),
                 ).toList(),
                 onChanged: (value) {
@@ -301,17 +304,18 @@ class _AdminBoardPageState extends State<AdminBoardPage> {
                     _fetchData();
                   });
                 },
-              )
+              ),
             ),
           ],
         ),
         const SizedBox(height: 12),
+        // 날짜 선택 버튼
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: mainColor),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              side: const BorderSide(color: Color(0xFF819CFF)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () async {
               final picked = await showDateRangePicker(
@@ -337,8 +341,8 @@ class _AdminBoardPageState extends State<AdminBoardPage> {
           width: double.infinity,
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: mainColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: const Color(0xFF819CFF),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: _fetchData,
             child: const Text('검색', style: TextStyle(color: Colors.white)),

@@ -289,44 +289,57 @@ class _CartPageState extends State<CartPage> {
       },
     );
   }
+
   String _getColorLabel(String id) {
     switch (id.toLowerCase()) {
       case 'blue':
         return '블루';
+      case 'lightblue':
+        return '라이트 블루';
+      case 'navy':
+        return '네이비';
+      case 'skyblue':
+        return '스카이 블루';
       case 'green':
         return '그린';
+      case 'lightgreen':
+        return '라이트 그린';
+      case 'olive':
+        return '올리브';
+      case 'lime':
+        return '라임';
+      case 'red':
+        return '레드';
       case 'pink':
       case 'pinkaccent':
         return '핑크';
-      case 'red':
-        return '레드';
-      case 'navy':
-        return '네이비';
-      case 'black':
-        return '블랙';
-      case 'white':
-        return '화이트';
-      case 'gray':
-      case 'grey':
-        return '그레이';
+      case 'hotpink':
+        return '핫핑크';
       case 'orange':
         return '오렌지';
       case 'yellow':
         return '옐로우';
+      case 'gold':
+        return '골드';
+      case 'brown':
+        return '브라운';
       case 'beige':
         return '베이지';
       case 'purple':
         return '퍼플';
       case 'lavender':
         return '라벤더';
-      case 'skyblue':
-        return '스카이 블루';
-      case 'lime':
-        return '라임';
-      case 'olive':
-        return '올리브';
-      case 'gold':
-        return '골드';
+      case 'white':
+        return '화이트';
+      case 'black':
+        return '블랙';
+      case 'gray':
+      case 'grey':
+        return '그레이';
+      case 'skin':
+        return '살구';
+      case 'charcoal':
+        return '차콜';
       default:
         return id;
     }

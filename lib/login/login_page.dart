@@ -54,7 +54,14 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      final userEmail = query.docs.first['userEmail'];
+      final userDoc = query.docs.first;
+      final userEmail = userDoc['userEmail'];
+      final isDeleted = userDoc['deleted'] ?? false;
+      
+      if (isDeleted == true) {
+        _showToast("탈퇴한 회원입니다. 로그인할 수 없습니다.");
+        return;
+      }
 
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: userEmail,
