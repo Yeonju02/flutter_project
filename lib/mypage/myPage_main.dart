@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../login/login_page.dart';
 import '../board/board_main_screen.dart';
@@ -103,7 +104,7 @@ class _MyPageMainState extends State<MyPageMain> {
   List<Map<String, dynamic>> pendingOrders = [];
   List<Map<String, dynamic>> completedOrders = [];
 
-  // 결제 완료 + 취소 목록 가져오기
+  // 결제 완료 +  배송중 + 취소 목록 가져오기
   Future<List<Map<String, dynamic>>> fetchOrderList(bool isCompleted) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
@@ -121,15 +122,11 @@ class _MyPageMainState extends State<MyPageMain> {
     List<Map<String, dynamic>> results = [];
 
     for (var doc in snapshot.docs) {
-      final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      final data = doc.data() as Map<String, dynamic>;
       final productId = data['productId'];
       final selectedColor = (data['selectedColor'] ?? '').toString();
 
-      final productDoc = await FirebaseFirestore.instance
-          .collection('products')
-          .doc(productId)
-          .get();
-
+      final productDoc = await FirebaseFirestore.instance.collection('products').doc(productId).get();
       final productData = productDoc.data();
 
       if (productData != null) {
@@ -143,11 +140,16 @@ class _MyPageMainState extends State<MyPageMain> {
           'productName': productData['productName'] ?? '',
           'productPrice': productData['productPrice'] ?? 0,
           'productImage': imgPath.startsWith('http') ? imgPath : '',
+          'orderedDate': data['orderedAt'] != null && data['orderedAt'] is Timestamp
+              ? (data['orderedAt'] as Timestamp).toDate()
+              : null,
         });
       }
     }
+
     return results;
   }
+
 
   // 배송 완료 목록 가져오기
   Future<List<Map<String, dynamic>>> fetchCompletedOrderList() async {
@@ -168,6 +170,13 @@ class _MyPageMainState extends State<MyPageMain> {
     for (var doc in snapshot.docs) {
       final orderData = doc.data() as Map<String, dynamic>;
       final productId = orderData['productId'] as String;
+      final orderedAt = orderData['orderedAt'];
+      DateTime? orderedDate;
+
+      if (orderedAt is Timestamp) {
+        orderedDate = orderedAt.toDate();
+      }
+
       final selectedColorRaw = orderData['selectedColor'] ?? '';
       final selectedColor = selectedColorRaw.toString().trim().toLowerCase();
 
@@ -183,10 +192,6 @@ class _MyPageMainState extends State<MyPageMain> {
 
 
       final hasMatchingReview = reviewDoc.exists;
-
-      if (hasMatchingReview) {
-        continue;
-      }
 
       // 상품 데이터 불러오기
       final productDoc = await FirebaseFirestore.instance
@@ -209,6 +214,9 @@ class _MyPageMainState extends State<MyPageMain> {
         'productName': productData['productName'] ?? '',
         'productPrice': productData['productPrice'] ?? 0,
         'productImage': imgPath.startsWith('http') ? imgPath : '',
+        'hasReview': hasMatchingReview,
+        'orderedDate': orderedDate,
+
       });
     }
 
@@ -269,6 +277,11 @@ class _MyPageMainState extends State<MyPageMain> {
 
         final imgPath = getImageUrlFromColors(colorsList, selectedColor);
 
+        final reviewDate = reviewData['createdAt'] != null && reviewData['createdAt'] is Timestamp
+            ? (reviewData['createdAt'] as Timestamp).toDate()
+            : null;
+
+
         result.add({
           ...reviewData,
           'productId': productId,
@@ -279,12 +292,79 @@ class _MyPageMainState extends State<MyPageMain> {
           'selectedColor': selectedColor,
           'colors': colorsList,
           'description': productData['description'] ?? '',
+          'reviewDate': reviewDate,
         });
       }
     }
 
     return result;
   }
+
+  // 배송 완료된 날짜별로 그룹 배송 완료 리스트 묶기
+  Map<String, List<Map<String, dynamic>>> groupOrdersByDate(List<Map<String, dynamic>> orders) {
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+
+    for (var order in orders) {
+      final date = order['orderedDate'] as DateTime?;
+      if (date == null) continue;
+
+      final formattedDate = DateFormat('yyyy년 M월 d일').format(date);
+
+      grouped.putIfAbsent(formattedDate, () => []);
+      grouped[formattedDate]!.add(order);
+    }
+
+    return grouped;
+  }
+
+  // 결제완료된 날짜별로 그룹 결제 완료 리스트 묶기
+  Map<String, List<Map<String, dynamic>>> groupPendingOrdersByDate(List<Map<String, dynamic>> orders) {
+    Map<String, List<Map<String, dynamic>>> grouped = {};
+
+    for (var order in orders) {
+      final date = order['orderedDate'];
+      if (date == null || date is! DateTime) {
+        continue;
+      }
+
+      // 날짜 키를 보기 좋게 포맷팅 (예: "2025년 6월 20일")
+      final key = "${date.year}년 ${date.month}월 ${date.day}일";
+
+      if (!grouped.containsKey(key)) {
+        grouped[key] = [];
+      }
+      grouped[key]!.add(order);
+    }
+
+    return grouped;
+  }
+
+  // 리뷰를 날짜별로 리스트 묶기
+  Map<String, List<Map<String, dynamic>>> groupReviewsByDate(List<Map<String, dynamic>> reviews) {
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+
+    for (var review in reviews) {
+      final DateTime? reviewDate = review['reviewDate'];
+      if (reviewDate == null) continue;
+
+      final dateKey = "${reviewDate.year}년 ${reviewDate.month}월 ${reviewDate.day}일";
+
+
+
+      if (!grouped.containsKey(dateKey)) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey]!.add(review);
+    }
+
+    return grouped;
+  }
+
+
+
+
+
+
 
 
 
@@ -482,17 +562,15 @@ class _MyPageMainState extends State<MyPageMain> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    List<Map<String, dynamic>> allOrders = [];
-    List<Map<String, dynamic>> completedOrders = await fetchCompletedOrderList();
-    List<Map<String, dynamic>> pendingOrders = await fetchOrderList(false);
-
-    allOrders = [...pendingOrders, ...completedOrders];
+    final pending = await fetchOrderList(false);
+    final completed = await fetchCompletedOrderList();
 
     setState(() {
-      orderList = allOrders;
+      orderList = [...pending, ...completed]; // 여기서 잘 할당되었는지
       isLoading = false;
     });
   }
+
 
 
   // 1. 프로필 편집 다이얼로그 상태 변수
@@ -806,7 +884,8 @@ class _MyPageMainState extends State<MyPageMain> {
                         Navigator.of(context).pop();
 
                         await FirebaseAuth.instance.signOut();
-
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.clear(); // 모든 저장된 데이터를 제거
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(builder: (context) => LoginPage()),
@@ -1437,21 +1516,45 @@ class _MyPageMainState extends State<MyPageMain> {
               ],
             ),
           )
-              : ListView.builder(
-            itemCount: showList.length,
-            itemBuilder: (context, index) {
-              final order = showList[index];
-              return selectedDeliveryTab == 0
-                  ? _buildPendingOrderItem(order)
-                  : _buildCompletedOrderItem(order);
-            },
-          ),
+              : selectedDeliveryTab == 1
+              ? buildGroupedCompletedOrders(showList.cast<Map<String, dynamic>>())
+              : buildGroupedPendingOrders(showList.cast<Map<String, dynamic>>()),
         ),
+
       ],
+
     );
   }
 
 
+  Widget buildGroupedPendingOrders(List<Map<String, dynamic>> orders) {
+    final groupedOrders = groupPendingOrdersByDate(orders);
+
+    // 최신 날짜가 위로 오게 정렬
+    final sortedEntries = groupedOrders.entries.toList()
+      ..sort((a, b) => b.key.compareTo(a.key));
+
+    return ListView(
+      children: sortedEntries.map((entry) {
+        final date = entry.key;
+        final ordersForDate = entry.value;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Text(
+                date,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ...ordersForDate.map((order) => _buildPendingOrderItem(order)).toList(),
+          ],
+        );
+      }).toList(),
+    );
+  }
 
   // 결제완료(배송전) + 배송중 + 취소됨 배송 대기 리스트
   Widget _buildPendingOrderItem(Map<String, dynamic> order) {
@@ -1589,8 +1692,14 @@ class _MyPageMainState extends State<MyPageMain> {
               SizedBox(height: 8),
               Center(
                 child: TextButton(
-                  onPressed: () =>
-                      showCancelOrderDialog(context, order['documentId']),
+                  onPressed: () {
+                    showCancelOrderDialog(context, order['documentId'], () async {
+                      final updatedOrders = await fetchOrderList(false);
+                      setState(() {
+                        orderList = updatedOrders;
+                      });
+                    });
+                  },
                   child: Text("주문 취소하기", style: TextStyle(color: Colors.red)),
                 ),
               ),
@@ -1600,8 +1709,48 @@ class _MyPageMainState extends State<MyPageMain> {
     );
   }
 
+
+  Widget buildGroupedCompletedOrders(List<Map<String, dynamic>> orders) {
+    final groupedOrders = groupOrdersByDate(orders);
+
+    // 날짜 문자열을 DateTime으로 변환하여 정렬
+    final sortedEntries = groupedOrders.entries.toList()
+      ..sort((a, b) {
+        DateTime dateA = DateFormat('yyyy년 M월 d일').parse(a.key);
+        DateTime dateB = DateFormat('yyyy년 M월 d일').parse(b.key);
+        return dateB.compareTo(dateA); // 내림차순 (최신 날짜 위)
+      });
+
+    return ListView(
+      children: sortedEntries.map((entry) {
+        final date = entry.key;
+        final ordersForDate = entry.value;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Text(
+                date,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ...ordersForDate.map((order) => _buildCompletedOrderItem(order)).toList(),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+
   // 배송 완료되자마자 보일 배송 완료 리스트
   Widget _buildCompletedOrderItem(Map<String, dynamic> order) {
+    final orderedDate = order['orderedDate'] as DateTime?;
+    final formattedDate = orderedDate != null
+        ? DateFormat('yyyy년 M월 d일').format(orderedDate)
+        : '';
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       padding: EdgeInsets.all(16),
@@ -1619,17 +1768,9 @@ class _MyPageMainState extends State<MyPageMain> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text("배송 완료", style: TextStyle(fontSize: 12)),
-              TextButton(
-                onPressed: () {
-                },
-                child: Text("교환/환불 신청", style: TextStyle(color: Colors.red)),
-                style: TextButton.styleFrom(
-                  minimumSize: Size(0, 30),
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
+              // if (formattedDate.isNotEmpty)
+              //   Text("배송 완료 날짜: $formattedDate",
+              //       style: TextStyle(fontSize: 12, color: Colors.grey[700])),
             ],
           ),
 
@@ -1639,7 +1780,6 @@ class _MyPageMainState extends State<MyPageMain> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
                 child: Image.network(
                   order['productImage'] ?? '',
                   width: 60,
@@ -1679,32 +1819,34 @@ class _MyPageMainState extends State<MyPageMain> {
 
           SizedBox(height: 12),
 
-          Center(
-            child: ElevatedButton(
-              onPressed: () async {
-                final result = await showReviewDialog(context, order);
-                if (result == true) {
-                  final updatedCompleted = await fetchCompletedOrderList();
-                  setState(() {
-                    completedOrders = updatedCompleted;
-                  });
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF272727),
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+          if ((order['hasReview'] ?? false) == false)
+            Center(
+              child: ElevatedButton(
+                onPressed: () async {
+                  final result = await showReviewDialog(context, order);
+                  if (result == true) {
+                    final updatedCompleted = await fetchCompletedOrderList();
+                    setState(() {
+                      completedOrders = updatedCompleted;
+                    });
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF272727),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                 ),
+                child: Text("리뷰 작성하기"),
               ),
-              child: Text("리뷰 작성하기"),
             ),
-          ),
         ],
       ),
     );
   }
+
 
   // 리뷰 리스트
   Widget _buildMyReviews(List<String> myProductIds) {
@@ -1719,164 +1861,179 @@ class _MyPageMainState extends State<MyPageMain> {
         }
 
         final reviews = snapshot.data!;
+        final groupedReviews = groupReviewsByDate(reviews);
+        final sortedDates = groupedReviews.keys.toList()
+          ..sort((a, b) => b.compareTo(a)); // 최신 날짜부터 보여주기
 
         return ListView.builder(
-          itemCount: reviews.length,
+          itemCount: sortedDates.length,
           itemBuilder: (context, index) {
-            final review = reviews[index];
-            final imageUrl = review['productImage'] ?? '';
-            final selectedColor = review['selectedColor'] ?? '';
-            final reviewImages = (review['images'] ?? <String>[]) as List<dynamic>;
+            final dateKey = sortedDates[index];
+            final reviewsForDate = groupedReviews[dateKey]!;
 
-            return Card(
-              margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              color: Colors.white,
-              elevation: 2,
-              shadowColor: Colors.black.withOpacity(0.5),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) {
-                                      return ProductDetailPage(data: review);
-                                    }
-                                  ),
-                                );
-                              },
-                              child: imageUrl.isNotEmpty
-                                  ? Image.network(
-                                imageUrl,
-                                width: 60,
-                                height: 60,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Icon(Icons.broken_image, size: 60),
-                              )
-                                  : Icon(Icons.image_not_supported, size: 60),
-                            ),
-                            SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(Icons.star, color: Colors.amber, size: 16),
-                                SizedBox(width: 4),
-                                Text(
-                                  "${review['score']}",
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Text(
+                    dateKey,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ...reviewsForDate.map((review) {
+                  final imageUrl = review['productImage'] ?? '';
+                  final selectedColor = review['selectedColor'] ?? '';
+                  final reviewImages = (review['images'] ?? <String>[]) as List<dynamic>;
 
-                        SizedBox(width: 12),
-
-                        Expanded(
-                          child: Column(
+                  return Card(
+                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    color: Colors.white,
+                    elevation: 2,
+                    shadowColor: Colors.black.withOpacity(0.5),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                review['productName'] ?? '',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                overflow: TextOverflow.ellipsis,
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ProductDetailPage(data: review),
+                                        ),
+                                      );
+                                    },
+                                    child: imageUrl.isNotEmpty
+                                        ? Image.network(
+                                      imageUrl,
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          Icon(Icons.broken_image, size: 60),
+                                    )
+                                        : Icon(Icons.image_not_supported, size: 60),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.star, color: Colors.amber, size: 16),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        "${review['score']}",
+                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              SizedBox(height: 4),
-                              Text(
-                                "${review['productPrice']}원",
-                                style: TextStyle(color: Colors.grey[600]),
-                              ),
-                              if (selectedColor.isNotEmpty)
-                                Text(
-                                  "선택한 옵션: $selectedColor",
-                                  style: TextStyle(color: Colors.grey[700]),
-                                ),
-                            ],
-                          ),
-                        ),
-
-                        PopupMenuButton<String>(
-                          icon: Icon(Icons.more_vert),
-                          onSelected: (value) async {
-                            final user = FirebaseAuth.instance.currentUser;
-                            if (user == null) return;
-
-                            final reviewDocId = review['orderId'] ?? '';
-
-                            if (value == 'edit') {
-                              await showEditReviewDialog(context, review, reviewDocId, () {
-                                setState(() {});
-                              });
-                            } else if (value == 'delete') {
-                              final confirmed = await showDialog<bool>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text('리뷰 삭제'),
-                                  content: Text('정말 이 리뷰를 삭제하시겠습니까?'),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(context, false), child: Text('취소')),
-                                    TextButton(onPressed: () => Navigator.pop(context, true), child: Text('삭제')),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      review['productName'] ?? '',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      "${review['productPrice']}원",
+                                      style: TextStyle(color: Colors.grey[600]),
+                                    ),
+                                    if (selectedColor.isNotEmpty)
+                                      Text(
+                                        "선택한 옵션: $selectedColor",
+                                        style: TextStyle(color: Colors.grey[700]),
+                                      ),
                                   ],
                                 ),
-                              );
-                              if (confirmed == true) {
-                                await deleteReview(review['productId'], reviewDocId);
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('리뷰가 삭제되었습니다.')));
-                                setState(() {});
-                              }
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            PopupMenuItem(value: 'edit', child: Text('리뷰 수정')),
-                            PopupMenuItem(value: 'delete', child: Text('리뷰 삭제')),
-                          ],
-                        )
-
-
-                      ],
-                    ),
-
-                    SizedBox(height: 12),
-
-                    if (reviewImages.isNotEmpty)
-                      SizedBox(
-                        height: 100,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: reviewImages.length,
-                          itemBuilder: (context, i) {
-                            final imgUrl = reviewImages[i].toString();
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  imgUrl,
-                                  width: 100,
-                                  height: 100,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      Icon(Icons.broken_image, size: 100),
-                                ),
                               ),
-                            );
-                          },
-                        ),
+                              PopupMenuButton<String>(
+                                icon: Icon(Icons.more_vert),
+                                onSelected: (value) async {
+                                  final user = FirebaseAuth.instance.currentUser;
+                                  if (user == null) return;
+
+                                  final reviewDocId = review['orderId'] ?? '';
+
+                                  if (value == 'edit') {
+                                    await showEditReviewDialog(context, review, reviewDocId, () {
+                                      setState(() {});
+                                    });
+                                  } else if (value == 'delete') {
+                                    final confirmed = await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: Text('리뷰 삭제'),
+                                        content: Text('정말 이 리뷰를 삭제하시겠습니까?'),
+                                        actions: [
+                                          TextButton(
+                                              onPressed: () => Navigator.pop(context, false),
+                                              child: Text('취소')),
+                                          TextButton(
+                                              onPressed: () => Navigator.pop(context, true),
+                                              child: Text('삭제')),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirmed == true) {
+                                      await deleteReview(review['productId'], reviewDocId);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('리뷰가 삭제되었습니다.')));
+                                      setState(() {});
+                                    }
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(value: 'edit', child: Text('리뷰 수정')),
+                                  PopupMenuItem(value: 'delete', child: Text('리뷰 삭제')),
+                                ],
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          if (reviewImages.isNotEmpty)
+                            SizedBox(
+                              height: 100,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: reviewImages.length,
+                                itemBuilder: (context, i) {
+                                  final imgUrl = reviewImages[i].toString();
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8.0),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        imgUrl,
+                                        width: 100,
+                                        height: 100,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) =>
+                                            Icon(Icons.broken_image, size: 100),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                        ],
                       ),
-                  ],
-                ),
-              ),
+                    ),
+                  );
+                }).toList(),
+              ],
             );
           },
         );
@@ -1884,11 +2041,8 @@ class _MyPageMainState extends State<MyPageMain> {
     );
   }
 
-
-
-
   // 주문 취소 다이얼로그
-  void showCancelOrderDialog(BuildContext context, String documentId) {
+  void showCancelOrderDialog(BuildContext context, String documentId, VoidCallback onCancel) {
     final TextEditingController reasonController = TextEditingController();
     final List<String> cancelReasons = [
       '단순 변심',
@@ -2000,6 +2154,8 @@ class _MyPageMainState extends State<MyPageMain> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('주문이 취소되었습니다.')),
                               );
+
+                              onCancel();
                             }
                           },
                           style: ElevatedButton.styleFrom(
