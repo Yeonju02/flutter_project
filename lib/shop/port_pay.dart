@@ -33,7 +33,7 @@ class PortPay extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset('assets/iamport-logo.png'),
+            Image.asset('assets/logo.png'),
             const SizedBox(height: 15),
             const Text('잠시만 기다려주세요...', style: TextStyle(fontSize: 20)),
           ],
