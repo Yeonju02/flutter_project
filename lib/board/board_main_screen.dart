@@ -400,7 +400,46 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                 future: FirebaseFirestore.instance.collection('users').doc(post['userId']).get(),
                 builder: (context, userSnapshot) {
                   final userData = userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
-                  final level = userData['level'] != null ? 'LV.${userData['level']}' : 'LV.?';
+                  final List<Color> levelColors = [
+                    Color(0xFFFF0000), // 빨강
+                    Color(0xFFFF2600),
+                    Color(0xFFFF4D00),
+                    Color(0xFFFF7300),
+                    Color(0xFFFF7F00),
+                    Color(0xFFFF9933), // 주황
+
+                    Color(0xFFFFA533),
+                    Color(0xFFFFB233),
+                    Color(0xFFDAA520), // DarkGoldenrod (진한 금색)
+                    Color(0xFFB8860B), // DarkGoldenrod2
+                    Color(0xFF8B8000), // OliveDark
+                    Color(0xFF808000), // Olive
+
+                    Color(0xFF6B8E23), // OliveDrab
+                    Color(0xFF556B2F), // DarkOliveGreen
+                    Color(0xFF228B22), // ForestGreen
+                    Color(0xFF006400), // DarkGreen
+                    Color(0xFF006A4E), // Deep Green
+                    Color(0xFF008000), // Green
+
+                    Color(0xFF008B8B), // DarkCyan
+                    Color(0xFF0099CC), // Blueish Cyan
+                    Color(0xFF007BA7), // Cerulean
+                    Color(0xFF0066CC), // Strong Blue
+                    Color(0xFF0033CC),
+                    Color(0xFF0000FF), // 파랑
+
+                    Color(0xFF1B0091), // 남색
+                    Color(0xFF3400A2),
+                    Color(0xFF4B00B3),
+                    Color(0xFF6100C4),
+                    Color(0xFF7600D5),
+                    Color(0xFF8B00FF), // 보라
+                  ];
+
+                  final level = userData['level'] ?? 0;
+                  final levelColor = levelColors[(level - 1).clamp(0, levelColors.length - 1)];
+
                   final String? profileImg = userData['imgPath'];
                   final isPostWriterAdmin = userData['status'] == 'A';
 
@@ -450,7 +489,22 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                             fontSize: 12),
                                       ),
                                     )
-                                        : Text(level, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                        : Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: levelColor, width: 1),
+                                      ),
+                                      child: Text(
+                                        'Lv.$level',
+                                        style: TextStyle(
+                                          color: levelColor,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                                 Row(
