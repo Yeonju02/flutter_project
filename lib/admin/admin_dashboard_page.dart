@@ -33,9 +33,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Future<void> _loadDashboardData() async {
     final now = DateTime.now();
-    final formatter = DateFormat('yyyy-MM-dd');
     final monthFormatter = DateFormat('yyyy-MM');
-    final todayStr = formatter.format(now);
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
 
     final ordersSnapshot = await FirebaseFirestore.instance.collectionGroup('orders').get();
     final usersSnapshot = await FirebaseFirestore.instance.collection('users').get();
@@ -56,7 +56,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     for (var order in ordersSnapshot.docs) {
       final data = order.data() as Map<String, dynamic>;
-      final ts = (data['createdAt'] as Timestamp?)?.toDate();
+      final ts = (data['orderedAt'] as Timestamp?)?.toDate();
       final price = (data['productPrice'] as int?) ?? 0;
       allTotal += price;
 
@@ -65,7 +65,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         if (monthlySalesMap.containsKey(orderMonth)) {
           monthlySalesMap[orderMonth] = (monthlySalesMap[orderMonth] ?? 0) + price;
         }
-        if (formatter.format(ts) == todayStr) {
+        if (ts.isAfter(today) && ts.isBefore(tomorrow)) {
           todayTotal += price;
         }
       }
@@ -79,7 +79,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         if (monthlyUserMap.containsKey(userMonth)) {
           monthlyUserMap[userMonth] = (monthlyUserMap[userMonth] ?? 0) + 1;
         }
-        if (formatter.format(ts) == todayStr) {
+        if (ts.isAfter(today) && ts.isBefore(tomorrow)) {
           todayNew++;
         }
       }
@@ -222,7 +222,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const UserAdminPage()));
               break;
             case 1:
-            // 현재 페이지
               break;
             case 2:
               Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminBoardPage()));
@@ -239,18 +238,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
 double _getYAxisInterval(List<FlSpot> data) {
   final maxValue = data.map((e) => e.y).fold(0.0, max);
-  if (maxValue <= 10) return 2;
-  if (maxValue <= 100) return 10;
-  if (maxValue <= 1000) return 100;
-  return 500;
+
+  if (maxValue <= 10_000) return 2_000;
+  if (maxValue <= 50_000) return 5_000;
+  if (maxValue <= 100_000) return 10_000;
+  if (maxValue <= 300_000) return 30_000;
+  if (maxValue <= 1_000_000) return 100_000;
+  return 200_000;
 }
 
 String _formatYAxisLabel(double value) {
-  if (value >= 10000) {
-    return '${(value / 10000).toStringAsFixed(1)}만';
+  if (value >= 100000) {
+    return '${(value / 10000).toStringAsFixed(0)}만';
   } else if (value >= 1000) {
     return '${(value / 1000).toStringAsFixed(0)}k';
   } else {
     return value.toInt().toString();
   }
 }
+

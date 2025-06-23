@@ -287,9 +287,9 @@ class _AddProductPageState extends State<AddProductPage> {
               ElevatedButton(
                 onPressed: isUploading ? null : _submitProduct,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFA5C8F8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: const Color(0xFF819CFF),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: isUploading
                     ? const CircularProgressIndicator(color: Colors.white)

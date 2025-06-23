@@ -9,6 +9,7 @@ import 'cart.dart';
 import 'product_detail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../custom/bottom_nav_bar.dart';
+import 'package:dropdown_button2/dropdown_button2.dart';
 
 class ShopMainPage extends StatefulWidget {
   const ShopMainPage({super.key});
@@ -93,90 +94,84 @@ class _ShopMainPageState extends State<ShopMainPage> {
 
               // 메인/서브 카테고리 선택 영역
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 🔵 메인 카테고리 버튼 (무조건 출력)
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: categoryMap.keys.map((main) {
-                          final isSelected = selectedMainCategory == main;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ChoiceChip(
-                              label: Text(main),
-                              selected: isSelected,
-                              onSelected: (_) {
-                                setState(() {
-                                  selectedMainCategory = main;
-                                  selectedSubCategory = '';
-                                });
-                              },
-                              selectedColor: Color(0xFF92BBE2),
-                              backgroundColor: Color(0xFFE0E0E0),
-                              labelStyle: TextStyle(
-                                color: isSelected ? Colors.white : Colors.black,
-                                fontWeight: FontWeight.w500,
-                              ),
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: categoryMap.keys.map((cat) {
+                      final isSelected = selectedMainCategory == cat;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(showCheckmark: false,
+                          label: Text(
+                            cat,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
                             ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // 🔹 서브 카테고리 (선택된 메인카테고리에만 등장)
-                    if (selectedMainCategory != '전체' && categoryMap[selectedMainCategory]!.isNotEmpty)
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                        margin: const EdgeInsets.only(top: 4),
-                        decoration: BoxDecoration(
-                          color: Color(0xFFF0F4FA),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 6,
-                              offset: Offset(0, 3),
+                          ),
+                          selected: isSelected,
+                          onSelected: (_) {
+                            setState(() {
+                              selectedMainCategory = cat;
+                              selectedSubCategory = '';
+                            });
+                          },
+                          selectedColor: const Color(0xFF92BBE2),
+                          backgroundColor: const Color(0xFFE0E0E0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(
+                              color: isSelected ? const Color(0xFF92BBE2) : Colors.grey.shade300,
                             ),
-                          ],
-                        ),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: categoryMap[selectedMainCategory]!.map((sub) {
-                              final isSelected = selectedSubCategory == sub;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: ChoiceChip(
-                                  label: Text(sub),
-                                  selected: isSelected,
-                                  onSelected: (_) {
-                                    setState(() {
-                                      selectedSubCategory = sub;
-                                    });
-                                  },
-                                  selectedColor: Color(0xFF92BBE2),
-                                  backgroundColor: Color(0xFFE0E0E0),
-                                  labelStyle: TextStyle(
-                                    color: isSelected ? Colors.white : Colors.black,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
                           ),
                         ),
-                      ),
-                  ],
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 10),
+              if (selectedMainCategory != '전체' && categoryMap[selectedMainCategory]!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: categoryMap[selectedMainCategory]!.map((sub) {
+                        final isSelected = selectedSubCategory == sub;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(showCheckmark: false,
+                            label: Text(
+                              sub,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            selected: isSelected,
+                            onSelected: (_) {
+                              setState(() {
+                                selectedSubCategory = sub;
+                              });
+                            },
+                            selectedColor: const Color(0xFF92BBE2),
+                            backgroundColor: const Color(0xFFE0E0E0),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(
+                                color: isSelected ? const Color(0xFF92BBE2) : Colors.grey.shade300,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
 
               // 상품 리스트
               Expanded(

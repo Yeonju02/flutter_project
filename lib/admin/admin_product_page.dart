@@ -97,14 +97,21 @@ class _AdminProductPageState extends State<AdminProductPage> {
                       Expanded(
                         child: DropdownButtonFormField2<String>(
                           isExpanded: true,
-                          decoration: _dropdownInputDecoration('대분류'),
+                          decoration: InputDecoration(
+                            hintText: '대분류',
+                            filled: true,
+                            fillColor: const Color(0xFFF7F8FA),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
                           value: selectedMainCategory ?? '전체',
-                          items: categoryMap.keys
-                              .map((main) => DropdownMenuItem<String>(
+                          items: categoryMap.keys.map((main) => DropdownMenuItem<String>(
                             value: main,
                             child: Text(main, overflow: TextOverflow.visible),
-                          ))
-                              .toList(),
+                          )).toList(),
                           onChanged: (val) {
                             setState(() {
                               selectedMainCategory = val;
@@ -112,14 +119,14 @@ class _AdminProductPageState extends State<AdminProductPage> {
                             });
                           },
                           buttonStyleData: const ButtonStyleData(
-                            height: 28,
                             padding: EdgeInsets.symmetric(horizontal: 14),
+                            height: 30,
                           ),
                           dropdownStyleData: DropdownStyleData(
                             maxHeight: 250,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF0F4FA),
-                              borderRadius: BorderRadius.circular(12),
+                              color: const Color(0xFFF7F8FA),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                           ),
                         ),
@@ -129,7 +136,16 @@ class _AdminProductPageState extends State<AdminProductPage> {
                       Expanded(
                         child: DropdownButtonFormField2<String>(
                           isExpanded: true,
-                          decoration: _dropdownInputDecoration('소분류'),
+                          decoration: InputDecoration(
+                            hintText: '소분류',
+                            filled: true,
+                            fillColor: const Color(0xFFF7F8FA),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
                           value: selectedSubCategory,
                           items: (selectedMainCategory != null &&
                               selectedMainCategory != '전체' &&
@@ -147,14 +163,14 @@ class _AdminProductPageState extends State<AdminProductPage> {
                             });
                           },
                           buttonStyleData: const ButtonStyleData(
-                            height: 28,
                             padding: EdgeInsets.symmetric(horizontal: 14),
+                            height: 30,
                           ),
                           dropdownStyleData: DropdownStyleData(
                             maxHeight: 250,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF0F4FA),
-                              borderRadius: BorderRadius.circular(12),
+                              color: const Color(0xFFF7F8FA),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                           ),
                         ),
@@ -177,8 +193,8 @@ class _AdminProductPageState extends State<AdminProductPage> {
                       });
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFA5C8F8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      backgroundColor: const Color(0xFF819CFF),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     child: const Text('상품 추가', style: TextStyle(color: Colors.white)),

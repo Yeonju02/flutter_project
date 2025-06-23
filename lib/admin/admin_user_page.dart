@@ -17,7 +17,7 @@ class UserAdminPage extends StatefulWidget {
 
 class _UserAdminPageState extends State<UserAdminPage> {
   String selectedFilter = '최신순';
-  final List<String> filterList = ['최신순', '오래된순', '탈퇴한 회원'];
+  final List<String> filterList = ['최신순', '오래된순', '탈퇴한 회원', 'Admin', 'User'];
 
   String searchText = '';
 
@@ -26,18 +26,25 @@ class _UserAdminPageState extends State<UserAdminPage> {
     Query<Map<String, dynamic>> query;
 
     if (selectedFilter == '탈퇴한 회원') {
-      // 정렬 생략: 인덱스 없이 우선 조회만
       query = FirebaseFirestore.instance
           .collection('users')
           .where('deleted', isEqualTo: true);
     } else if (selectedFilter == '오래된순') {
-      query = FirebaseFirestore.instance
-          .collection('users')
-          .orderBy('joinedAt', descending: false);
+    query = FirebaseFirestore.instance
+        .collection('users')
+        .orderBy('joinedAt', descending: false);
+    } else if (selectedFilter == 'Admin') {
+    query = FirebaseFirestore.instance
+        .collection('users')
+        .where('status', isEqualTo: 'A');
+    } else if (selectedFilter == 'User') {
+    query = FirebaseFirestore.instance
+        .collection('users')
+        .where('status', isEqualTo: 'U');
     } else {
-      query = FirebaseFirestore.instance
-          .collection('users')
-          .orderBy('joinedAt', descending: true);
+    query = FirebaseFirestore.instance
+        .collection('users')
+        .orderBy('joinedAt', descending: true);
     }
 
     return Scaffold(
@@ -188,6 +195,7 @@ class _UserAdminPageState extends State<UserAdminPage> {
   Widget _buildUserCard(Map<String, dynamic> user) {
     final isDeleted = user['deleted'] == true;
     final isAdmin = user['status'] == 'A';
+    final profileImg = user['imgPath'] ?? '';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -198,7 +206,15 @@ class _UserAdminPageState extends State<UserAdminPage> {
       ),
       child: Row(
         children: [
-          const CircleAvatar(child: Icon(Icons.person)),
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: const Color(0xFFA5C8F8),
+            backgroundImage:
+            profileImg.isNotEmpty ? NetworkImage(profileImg) : null,
+            child: profileImg.isEmpty
+                ? const Icon(Icons.person, color: Colors.white)
+                : null,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
