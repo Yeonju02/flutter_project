@@ -125,6 +125,7 @@ class _MyPageMainState extends State<MyPageMain> {
       final data = doc.data() as Map<String, dynamic>;
       final productId = data['productId'];
       final selectedColor = (data['selectedColor'] ?? '').toString();
+      final quantity = data['quantity'];
 
       final productDoc = await FirebaseFirestore.instance.collection('products').doc(productId).get();
       final productData = productDoc.data();
@@ -143,6 +144,7 @@ class _MyPageMainState extends State<MyPageMain> {
           'orderedDate': data['orderedAt'] != null && data['orderedAt'] is Timestamp
               ? (data['orderedAt'] as Timestamp).toDate()
               : null,
+          'quantity' : quantity
         });
       }
     }
@@ -181,6 +183,7 @@ class _MyPageMainState extends State<MyPageMain> {
       final selectedColor = selectedColorRaw.toString().trim().toLowerCase();
 
       final orderId = orderData['orderId'] as String? ?? doc.id;
+      final orderedQuantity = orderData['quantity'];
       final reviewDocId = '${user.uid}_$orderId';
 
       final reviewDoc = await FirebaseFirestore.instance
@@ -216,7 +219,7 @@ class _MyPageMainState extends State<MyPageMain> {
         'productImage': imgPath.startsWith('http') ? imgPath : '',
         'hasReview': hasMatchingReview,
         'orderedDate': orderedDate,
-
+        'orderedQuantity' : orderedQuantity
       });
     }
 
@@ -1632,11 +1635,13 @@ class _MyPageMainState extends State<MyPageMain> {
                       Text("선택한 옵션: $selectedColor",
                           style: TextStyle(color: Colors.grey[700])),
                     SizedBox(height: 2),
+                    Text("수량 : ${order['quantity']}개",
+                        style: TextStyle(color: Colors.grey[700]))
                   ],
                 ),
               ),
               Text(
-                "${order['productPrice'] ?? '0'} 원",
+                "${order['productPrice'] * order['quantity'] ?? '0'} 원",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -1801,12 +1806,13 @@ class _MyPageMainState extends State<MyPageMain> {
                           style: TextStyle(color: Colors.grey[700]),
                         ),
                       ),
+                    Text("수량 : ${order['orderedQuantity']}개",style: TextStyle(color: Colors.grey[700]))
                   ],
                 ),
               ),
 
               Text(
-                "${order['productPrice']} 원",
+                "${order['productPrice']*order['orderedQuantity']} 원",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -1836,7 +1842,23 @@ class _MyPageMainState extends State<MyPageMain> {
                 ),
                 child: Text("리뷰 작성하기"),
               ),
+            )
+          else
+            Center(
+              child: ElevatedButton(
+                onPressed: null, // 비활성화
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey.shade300,
+                  foregroundColor: Colors.grey.shade600,
+                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: Text("리뷰 작성 완료"),
+              ),
             ),
+
         ],
       ),
     );
@@ -1952,11 +1974,6 @@ class _MyPageMainState extends State<MyPageMain> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     SizedBox(height: 4),
-                                    Text(
-                                      "${review['productPrice']}원",
-                                      style:
-                                      TextStyle(color: Colors.grey[600]),
-                                    ),
                                     if (selectedColor.isNotEmpty)
                                       Text(
                                         "선택한 옵션: $selectedColor",
@@ -2426,7 +2443,6 @@ class _MyPageMainState extends State<MyPageMain> {
                       final orderId = order['orderId'];
                       final reviewDocId = '${user.uid}_$orderId';
 
-
                       try {
                         List<String> uploadedImageUrls = [];
                         for (var img in selectedImages) {
@@ -2450,7 +2466,7 @@ class _MyPageMainState extends State<MyPageMain> {
 
                         onReviewSaved();
 
-                        Navigator.of(context).pop();
+
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('리뷰가 저장되었습니다.')),
                         );
@@ -2695,14 +2711,14 @@ class _MyPageMainState extends State<MyPageMain> {
           Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(
+                padding: EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 20,
                 ),
                 child: Row(
                   children: [
                     CircleAvatar(
-                      radius: 30,
+                      radius: 40,
                       backgroundImage:
                       userData!['imgPath'] != null &&
                           userData!['imgPath'] != ''
@@ -2710,26 +2726,61 @@ class _MyPageMainState extends State<MyPageMain> {
                           : null,
                       child:
                       userData!['imgPath'] == ''
-                          ? const Icon(Icons.person, size: 40)
+                          ? Icon(Icons.person, size: 40)
                           : null,
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             userData!['nickName'] ?? '',
-                            style: const TextStyle(fontSize: 20,
-                                fontWeight: FontWeight.bold),
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4),
                           Text(userData!['userEmail'] ?? ''),
+                          SizedBox(height: 8),
+                          Row(
+                            children: [
+                              // 동그라미 안에 P 문자 아이콘
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF90ACD3), // 포인트 컬러
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'P',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              RichText(
+                                text: TextSpan(
+                                  text: '${userData?['point'] ?? 0}P',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                    color: Color(0xFF90ACD3),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
+
                     IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.black),
+                      icon: Icon(Icons.edit, color: Colors.black),
                       onPressed: () async {
                         originalImagePath = userData?['imgPath'];
                         pickedImage = null;
