@@ -46,3 +46,4 @@ app.*.map.json
 
 # firebase functions
 /functions/node_modules
+node_modules/
