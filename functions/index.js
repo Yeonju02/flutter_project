@@ -1,4 +1,5 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
@@ -84,25 +85,31 @@ exports.resetDailyMissions = onSchedule(
   }
 );
 
-// 매분마다 루틴시작 10분 전 알림 보내기
+// 매분마다 루틴시작 알림 보내기
 exports.notifyUpcomingRoutines = onSchedule(
   {
-    schedule: "* * * * *", // 매 분
+    schedule: "* * * * *",
     timeZone: "Asia/Seoul",
   },
   async (event) => {
-    const now = new Date();
-    const nowPlus10 = new Date(now.getTime() + 10 * 60 * 1000);
+    const nowUTC = new Date();
+    const now = new Date(nowUTC.getTime() + 9 * 60 * 60 * 1000); //ktc로 보정
+    const dateStr = now.toISOString().slice(0, 10);
+    const timeStr = formatAMPM(now);
 
-    const dateStr = nowPlus10.toISOString().slice(0, 10);
-    const timeStr = formatAMPM(nowPlus10);
+    console.log(`[현재 시각] date: ${dateStr}, time: ${timeStr}`);
 
     const usersSnapshot = await admin.firestore().collection("users").get();
 
     for (const userDoc of usersSnapshot.docs) {
       const userId = userDoc.id;
       const fcmToken = userDoc.data().fcmToken;
-      if (!fcmToken) continue;
+      if (!fcmToken) {
+        console.log(` FCM 토큰 없음`);
+        continue;
+      }
+
+      console.log(`fcmToken: ${fcmToken}`);
 
       const routineSnapshot = await admin
         .firestore()
@@ -111,18 +118,27 @@ exports.notifyUpcomingRoutines = onSchedule(
         .collection("routineLogs")
         .where("date", "==", dateStr)
         .where("startTime", "==", timeStr)
+        .where("isFinished", "==", false)
         .get();
 
-      if (!routineSnapshot.empty) {
-        for (const routineDoc of routineSnapshot.docs) {
-          const data = routineDoc.data();
-          const title = data.title || "루틴";
+      if (routineSnapshot.empty) {
+        console.log(`[${userId}] 해당 시간(date: ${dateStr}, time: ${timeStr})에 시작하는 미완료 루틴 없음 `);
+      } else {
+        console.log(`[${userId}] 루틴 ${routineSnapshot.size}개 찾음`);
+      }
 
+      for (const routineDoc of routineSnapshot.docs) {
+        const data = routineDoc.data();
+        const title = data.title || "루틴";
+
+        console.log(`[푸시 전송] userId: ${userId}, title: ${title}, fcmToken: ${fcmToken}`);
+
+        try {
           await admin.messaging().send({
             token: fcmToken,
             notification: {
-              title: "루틴 10분 전 알림",
-              body: `"${title}" 루틴이 10분 뒤에 시작돼요!`,
+              title: "루틴 시작 알림",
+              body: `"${title}" 루틴 시작 시간입니다!`,
             },
             android: { priority: "high" },
             apns: {
@@ -133,6 +149,8 @@ exports.notifyUpcomingRoutines = onSchedule(
               },
             },
           });
+        } catch (err) {
+          console.error(`[${userId}] 알림 전송 실패`, err);
         }
       }
     }
@@ -141,13 +159,15 @@ exports.notifyUpcomingRoutines = onSchedule(
   }
 );
 
-// 루틴 시간 포맷 바꾸는 함수
 function formatAMPM(date) {
   let hours = date.getHours();
   let minutes = date.getMinutes();
   const ampm = hours >= 12 ? "PM" : "AM";
+
   hours = hours % 12;
-  hours = hours ? hours : 12; // 0시 → 12
-  const minutesStr = minutes < 10 ? "0" + minutes : minutes;
+  if (hours === 0) hours = 12;
+
+  const minutesStr = minutes < 10 ? "0" + minutes : minutes.toString();
+
   return `${hours}:${minutesStr} ${ampm}`;
 }
