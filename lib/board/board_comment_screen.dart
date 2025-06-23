@@ -28,7 +28,10 @@ class _CommentScreenState extends State<CommentScreen> {
   Future<void> _loadNickName() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
     setState(() {
       myNickName = userDoc.data()?['nickName'] ?? '';
     });
@@ -52,7 +55,7 @@ class _CommentScreenState extends State<CommentScreen> {
     });
   }
 
-  void _onSubmitDone() {
+  void _clearInputs() {
     setState(() {
       _replyToId = null;
       _replyToNickname = null;
@@ -79,8 +82,9 @@ class _CommentScreenState extends State<CommentScreen> {
           replyToNickname: _replyToNickname,
           editTargetId: _editTargetId,
           editInitialContent: _editInitialContent,
-          onSubmitted: _onSubmitDone,
-        )
+          onSubmitted: _clearInputs,
+          onCancelReply: _clearInputs,
+        ),
       ],
     );
   }

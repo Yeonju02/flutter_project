@@ -49,23 +49,23 @@ class _CommentInputBarState extends State<CommentInputBar> {
   }
 
   void _updateControllerText() {
-    String newText = '';
-    if (widget.editInitialContent != null) {
-      newText = widget.editInitialContent!;
-    } else if (widget.replyToNickname != null) {
-      newText = '@${widget.replyToNickname} ';
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      String newText = '';
+      if (widget.editInitialContent != null) {
+        newText = widget.editInitialContent!;
+      } else if (widget.replyToNickname != null && widget.editTargetId == null) {
+        newText = '@${widget.replyToNickname} ';
+      }
 
-    if (_controller.text != newText) {
-      _controller.text = newText;
-      _controller.selection = TextSelection.fromPosition(
-        TextPosition(offset: _controller.text.length),
+      _controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newText.length),
       );
-    }
 
-    if (widget.replyToId != null || widget.editTargetId != null) {
-      _focusNode.requestFocus();
-    }
+      if (widget.replyToId != null || widget.editTargetId != null) {
+        _focusNode.requestFocus();
+      }
+    });
   }
 
   Future<void> _submitComment() async {
@@ -74,9 +74,14 @@ class _CommentInputBarState extends State<CommentInputBar> {
     if (content.isEmpty || user == null) return;
 
     final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    if (!mounted) return;
+
     final nickName = userDoc['nickName'] ?? '';
     final imgPath = userDoc['imgPath'] ?? '';
-    final commentsRef = FirebaseFirestore.instance.collection('boards').doc(widget.boardId).collection('comments');
+    final commentsRef = FirebaseFirestore.instance
+        .collection('boards')
+        .doc(widget.boardId)
+        .collection('comments');
 
     if (widget.editTargetId != null) {
       await commentsRef.doc(widget.editTargetId).update({
@@ -92,21 +97,25 @@ class _CommentInputBarState extends State<CommentInputBar> {
         'userId': user.uid,
       });
 
+      if (!mounted) return;
+
       if (widget.replyToId != null) {
         final parentCommentSnap = await commentsRef.doc(widget.replyToId!).get();
+        if (!mounted) return;
+
         final parentData = parentCommentSnap.data() as Map<String, dynamic>?;
         final receiverId = parentData?['userId'];
 
         if (receiverId != null && receiverId != user.uid) {
-          final notiSettingSnap = await FirebaseFirestore.instance
+          final settingSnap = await FirebaseFirestore.instance
               .collection('users')
               .doc(receiverId)
               .collection('notiSettings')
               .doc('main')
               .get();
-          final settings = notiSettingSnap.data();
-          final isEnabled = settings?['comment'] ?? true;
+          if (!mounted) return;
 
+          final isEnabled = settingSnap.data()?['comment'] ?? true;
           if (isEnabled) {
             await FirebaseFirestore.instance
                 .collection('users')
@@ -125,20 +134,23 @@ class _CommentInputBarState extends State<CommentInputBar> {
           }
         }
       } else {
-        final boardSnap = await FirebaseFirestore.instance.collection('boards').doc(widget.boardId).get();
+        final boardSnap =
+        await FirebaseFirestore.instance.collection('boards').doc(widget.boardId).get();
+        if (!mounted) return;
+
         final boardData = boardSnap.data() as Map<String, dynamic>?;
         final boardOwnerId = boardData?['userId'];
 
         if (boardOwnerId != null && boardOwnerId != user.uid) {
-          final notiSettingSnap = await FirebaseFirestore.instance
+          final settingSnap = await FirebaseFirestore.instance
               .collection('users')
               .doc(boardOwnerId)
               .collection('notiSettings')
               .doc('main')
               .get();
-          final settings = notiSettingSnap.data();
-          final isEnabled = settings?['comment'] ?? true;
+          if (!mounted) return;
 
+          final isEnabled = settingSnap.data()?['comment'] ?? true;
           if (isEnabled) {
             await FirebaseFirestore.instance
                 .collection('users')
@@ -159,6 +171,7 @@ class _CommentInputBarState extends State<CommentInputBar> {
       }
     }
 
+    if (!mounted) return;
     _controller.clear();
     widget.onSubmitted?.call();
     widget.onCancelReply?.call();
@@ -180,11 +193,14 @@ class _CommentInputBarState extends State<CommentInputBar> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.editTargetId != null;
+    final isReplying = widget.replyToNickname != null && !isEditing;
+
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.replyToNickname != null)
+          if (isReplying)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -214,23 +230,19 @@ class _CommentInputBarState extends State<CommentInputBar> {
                     focusNode: _focusNode,
                     controller: _controller,
                     decoration: InputDecoration(
-                      hintText: widget.replyToNickname != null
+                      hintText: isEditing
+                          ? '댓글을 수정하세요...'
+                          : isReplying
                           ? '@${widget.replyToNickname}에게 답글 달기...'
                           : '댓글을 입력하세요...',
                       contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF92BBE0),
-                          width: 2.0,
-                        ),
+                        borderSide: const BorderSide(color: Color(0xFF92BBE0), width: 2.0),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF92BBE0),
-                          width: 2.5,
-                        ),
+                        borderSide: const BorderSide(color: Color(0xFF92BBE0), width: 2.5),
                       ),
                     ),
                   ),
@@ -244,7 +256,8 @@ class _CommentInputBarState extends State<CommentInputBar> {
                       borderRadius: BorderRadius.circular(18),
                     ),
                   ),
-                  child: const Text('등록', style: TextStyle(color: Colors.white)),
+                  child: Text(isEditing ? '수정' : '등록',
+                      style: const TextStyle(color: Colors.white)),
                 ),
               ],
             ),

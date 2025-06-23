@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
-import 'package:routinelogapp/admin/admin_board_page.dart';
-import 'package:routinelogapp/board/board_comment_screen.dart';
 import 'package:routinelogapp/board/board_detail_screen.dart';
 import 'package:routinelogapp/board/board_write_screen.dart';
 import 'package:routinelogapp/custom/bottom_nav_bar.dart';
@@ -192,7 +190,6 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                   ],
                 ),
               ),
-              const Divider(thickness: 1),
               Expanded(
                 child: StreamBuilder<List<Map<String, dynamic>>>(
                   stream: _getVisiblePostsStream(),
@@ -650,14 +647,14 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                                           notiSettings?['like'] ?? false;
 
                                                       if (isLikeEnabled) {
-                                                        final userDoc =
-                                                        await FirebaseFirestore.instance
+
+                                                        final userDoc = await FirebaseFirestore.instance
                                                             .collection('users')
-                                                            .doc(userId)
+                                                            .doc(userId) // 좋아요 누른 사람 (현재 유저)
                                                             .get();
 
-                                                        final nickName =
-                                                            userDoc.data()?['nickName'] ?? '익명';
+                                                        final nickName = userDoc.data()?['nickName'] ?? '익명';
+                                                        final profileImage = userDoc.data()?['imgPath'] ?? '';
 
                                                         await FirebaseFirestore.instance
                                                             .collection('users')
@@ -667,7 +664,7 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                                           'notiType': 'like',
                                                           'notiMsg': '$nickName님이 게시글을 좋아합니다.',
                                                           'boardId': post['boardId'],
-                                                          'notiImg': profileImg,
+                                                          'notiImg': profileImage,
                                                           'createdAt':
                                                           FieldValue.serverTimestamp(),
                                                           'isRead': false,

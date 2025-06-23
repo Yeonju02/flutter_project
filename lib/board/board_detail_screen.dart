@@ -25,6 +25,9 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
   String? _replyToId;
   String? _replyToNickname;
 
+  String? _editTargetId;
+  String? _editInitialContent;
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +45,24 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     setState(() {
       _replyToId = null;
       _replyToNickname = null;
+    });
+  }
+
+  void _setEditTarget(String commentId, String content) {
+    setState(() {
+      _editTargetId = commentId;
+      _editInitialContent = content;
+      _replyToId = null;
+      _replyToNickname = null;
+    });
+  }
+
+  void _clearReplyOrEdit() {
+    setState(() {
+      _replyToId = null;
+      _replyToNickname = null;
+      _editTargetId = null;
+      _editInitialContent = null;
     });
   }
 
@@ -363,7 +384,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                         boardId: widget.boardId,
                         myNickName: myNickName,
                         onReplyTargetChanged: _setReplyTarget,
-                        onEdit: (id, content) {},
+                        onEdit: _setEditTarget,
                       )
                     ],
                   );
@@ -375,8 +396,19 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
             boardId: widget.boardId,
             replyToId: _replyToId,
             replyToNickname: _replyToNickname,
+            editTargetId: _editTargetId,
+            editInitialContent: _editInitialContent,
             onCancelReply: _clearReplyTarget,
-          ),
+            onSubmitted: () {
+              setState(() {
+                _editTargetId = null;
+                _editInitialContent = null;
+                _replyToId = null;
+                _replyToNickname = null;
+              });
+            },
+          )
+
         ],
       ),
     );
