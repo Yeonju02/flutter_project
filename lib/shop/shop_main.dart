@@ -192,8 +192,13 @@ class _ShopMainPageState extends State<ShopMainPage> {
 
                     final allProducts = snapshot.data!.docs;
 
-                    final filtered = allProducts.where((doc) {
+                    final filtered = allProducts.map((doc) {
                       final data = doc.data() as Map<String, dynamic>;
+                      return {
+                        ...data,
+                        'productId': doc.id,
+                      };
+                    }).where((data) {
                       final name = data['productName']?.toString() ?? '';
                       final category = data['productCategory'] ?? {};
                       final main = category['main'] ?? '';
@@ -204,13 +209,6 @@ class _ShopMainPageState extends State<ShopMainPage> {
                       final matchesSearch = name.contains(searchText);
 
                       return matchesMain && matchesSub && matchesSearch;
-                    }).map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      // ✅ 여기서 productId 포함해서 새 map 리턴
-                      return {
-                        ...data,
-                        'productId': doc.id,
-                      };
                     }).toList();
 
                     if (!_isLoading) {
@@ -229,7 +227,9 @@ class _ShopMainPageState extends State<ShopMainPage> {
                       itemBuilder: (context, index) {
                         final data = _displayedProducts[index];
                         return ProductCard(
+                          key: ValueKey(data['productId']),
                           data: data,
+                          productId: data['productId'],
                           onTap: () {
                             Navigator.push(
                               context,
@@ -333,54 +333,42 @@ class _ShopMainPageState extends State<ShopMainPage> {
   }
 }
 
-
-class ProductCard extends StatefulWidget {
+class ProductCard extends StatelessWidget {
   final Map<String, dynamic> data;
+  final String productId;
   final VoidCallback onTap;
 
   const ProductCard({
     super.key,
     required this.data,
+    required this.productId,
     required this.onTap,
   });
 
-  @override
-  State<ProductCard> createState() => _ProductCardState();
-}
-
-class _ProductCardState extends State<ProductCard> {
-  double avgRating = 0.0;
-  int reviewCount = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchRating();
-  }
-
-  void _fetchRating() async {
+  Future<Map<String, dynamic>> _fetchRating() async {
     final snapshot = await FirebaseFirestore.instance
         .collection('products')
-        .doc(widget.data['productId'])
+        .doc(productId)
         .collection('reviews')
         .get();
 
     double totalScore = 0;
     for (var doc in snapshot.docs) {
-      totalScore += (doc['score'] ?? 0).toDouble();
+      final score = doc['score'];
+      if (score != null) {
+        totalScore += (score as num).toDouble();
+      }
     }
 
-    setState(() {
-      reviewCount = snapshot.docs.length;
-      avgRating = reviewCount > 0 ? totalScore / reviewCount : 0.0;
-    });
+    return {
+      'avg': snapshot.docs.isNotEmpty ? totalScore / snapshot.docs.length : 0.0,
+      'count': snapshot.docs.length,
+    };
   }
 
   @override
   Widget build(BuildContext context) {
-    final data = widget.data;
     final formatter = NumberFormat('#,###');
-
     final List colors = data['colors'] ?? [];
     final firstColor = colors.isNotEmpty ? Map<String, dynamic>.from(colors[0]) : null;
     final stock = colors.fold<int>(0, (sum, item) {
@@ -390,7 +378,7 @@ class _ProductCardState extends State<ProductCard> {
     final isSoldOut = data['isSoldOut'] == true;
 
     return GestureDetector(
-      onTap: isSoldOut ? null : widget.onTap,
+      onTap: isSoldOut ? null : onTap,
       child: Opacity(
         opacity: isSoldOut ? 0.5 : 1.0,
         child: Stack(
@@ -431,18 +419,32 @@ class _ProductCardState extends State<ProductCard> {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 16),
-                        Text('별점 ${avgRating.toStringAsFixed(1)}', style: const TextStyle(fontSize: 13)),
-                        const SizedBox(width: 6),
-                        const Text('|', style: TextStyle(color: Colors.black54, fontSize: 16)),
-                        const SizedBox(width: 6),
-                        Text('$stock개 남음', style: const TextStyle(fontSize: 13)),
-                      ],
-                    ),
+                  FutureBuilder<Map<String, dynamic>>(
+                    future: _fetchRating(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Text('별점 로딩중...', style: TextStyle(fontSize: 13)),
+                        );
+                      }
+                      final avg = snapshot.data!['avg'] as double;
+                      final count = snapshot.data!['count'] as int;
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.star, color: Colors.amber, size: 16),
+                            Text('별점 ${avg.toStringAsFixed(1)}', style: const TextStyle(fontSize: 13)),
+                            const SizedBox(width: 6),
+                            const Text('|', style: TextStyle(color: Colors.black54, fontSize: 16)),
+                            const SizedBox(width: 6),
+                            Text('$stock개 남음', style: const TextStyle(fontSize: 13)),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
