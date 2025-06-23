@@ -112,7 +112,6 @@ class _CartPageState extends State<CartPage> {
                     (sum, doc) => sum + (doc['productPrice'] as int) * (quantities[doc.id] ?? 1),
               );
 
-              // 👇 이하 기존 UI 그대로...
               return Column(
                 children: [
                   Expanded(
@@ -122,7 +121,7 @@ class _CartPageState extends State<CartPage> {
                         crossAxisCount: 2,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
-                        childAspectRatio: 0.65,
+                        childAspectRatio: 0.6,
                       ),
                       itemCount: docs.length,
                       itemBuilder: (context, index) {
