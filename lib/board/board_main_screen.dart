@@ -113,7 +113,6 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                           selectedColor: const Color(0xFF92BBE2),     // 선택된 배경
                           backgroundColor: const Color(0xFFE0E0E0),   // 선택되지 않은 배경
                           elevation: 0,
-                          labelPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), // 크기 키우기
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                             side: BorderSide(
@@ -128,64 +127,74 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 20, 12, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // 최신글/인기글 드롭다운 (dropdown_button2 사용)
-                    DropdownButton2<String>(
-                      value: _sortOption,
-                      isExpanded: false,
-                      buttonStyleData: ButtonStyleData(
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF92BBE2),
-                          borderRadius: BorderRadius.circular(20),
+                    // 최신글/인기글 드롭다운 버튼
+                    IntrinsicWidth(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton2<String>(
+                          value: _sortOption,
+                          isExpanded: false,
+                          buttonStyleData: ButtonStyleData(
+                            height: 36,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF92BBE2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          dropdownStyleData: DropdownStyleData(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF92BBE2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          iconStyleData: const IconStyleData(
+                            icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.white),
+                            openMenuIcon: Icon(Icons.arrow_drop_up, size: 20, color: Colors.white),
+                          ),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          items: ['최신글', '인기글'].map((value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(
+                                value,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _sortOption = value);
+                            }
+                          },
                         ),
                       ),
-                      dropdownStyleData: DropdownStyleData(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF92BBE2),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      iconStyleData: const IconStyleData(
-                        icon: Icon(Icons.arrow_drop_down, color: Colors.white),
-                      ),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      underline: const SizedBox.shrink(),
-                      items: ['최신글', '인기글'].map((value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value, style: const TextStyle(color: Colors.white)),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _sortOption = value);
-                        }
-                      },
                     ),
-                    const SizedBox(width: 164),
+
                     // 글쓰기 버튼
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF92BBE2),
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(0, 44),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                    IntrinsicWidth(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF92BBE2),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          textStyle: const TextStyle(fontWeight: FontWeight.bold),
                         ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const BoardWriteScreen()),
+                          );
+                        },
+                        child: const Text("글쓰기"),
                       ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const BoardWriteScreen()),
-                        );
-                      },
-                      child: const Text("글쓰기", style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
