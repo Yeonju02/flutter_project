@@ -667,6 +667,7 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                                           'notiType': 'like',
                                                           'notiMsg': '$nickName님이 게시글을 좋아합니다.',
                                                           'boardId': post['boardId'],
+                                                          'notiImg': profileImg,
                                                           'createdAt':
                                                           FieldValue.serverTimestamp(),
                                                           'isRead': false,
