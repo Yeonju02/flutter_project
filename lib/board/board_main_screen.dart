@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
-import 'package:routinelogapp/admin/admin_board_page.dart';
-import 'package:routinelogapp/board/board_comment_screen.dart';
 import 'package:routinelogapp/board/board_detail_screen.dart';
 import 'package:routinelogapp/board/board_write_screen.dart';
 import 'package:routinelogapp/custom/bottom_nav_bar.dart';
@@ -115,7 +113,6 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                           selectedColor: const Color(0xFF92BBE2),     // 선택된 배경
                           backgroundColor: const Color(0xFFE0E0E0),   // 선택되지 않은 배경
                           elevation: 0,
-                          labelPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), // 크기 키우기
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                             side: BorderSide(
@@ -130,69 +127,78 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 20, 12, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // 최신글/인기글 드롭다운 (dropdown_button2 사용)
-                    DropdownButton2<String>(
-                      value: _sortOption,
-                      isExpanded: false,
-                      buttonStyleData: ButtonStyleData(
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF92BBE2),
-                          borderRadius: BorderRadius.circular(20),
+                    // 최신글/인기글 드롭다운 버튼
+                    IntrinsicWidth(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton2<String>(
+                          value: _sortOption,
+                          isExpanded: false,
+                          buttonStyleData: ButtonStyleData(
+                            height: 36,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF92BBE2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          dropdownStyleData: DropdownStyleData(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF92BBE2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          iconStyleData: const IconStyleData(
+                            icon: Icon(Icons.arrow_drop_down, size: 20, color: Colors.white),
+                            openMenuIcon: Icon(Icons.arrow_drop_up, size: 20, color: Colors.white),
+                          ),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          items: ['최신글', '인기글'].map((value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(
+                                value,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _sortOption = value);
+                            }
+                          },
                         ),
                       ),
-                      dropdownStyleData: DropdownStyleData(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF92BBE2),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      iconStyleData: const IconStyleData(
-                        icon: Icon(Icons.arrow_drop_down, color: Colors.white),
-                      ),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      underline: const SizedBox.shrink(),
-                      items: ['최신글', '인기글'].map((value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value, style: const TextStyle(color: Colors.white)),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _sortOption = value);
-                        }
-                      },
                     ),
-                    const SizedBox(width: 164),
+
                     // 글쓰기 버튼
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF92BBE2),
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(0, 44),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                    IntrinsicWidth(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF92BBE2),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          textStyle: const TextStyle(fontWeight: FontWeight.bold),
                         ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const BoardWriteScreen()),
+                          );
+                        },
+                        child: const Text("글쓰기"),
                       ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const BoardWriteScreen()),
-                        );
-                      },
-                      child: const Text("글쓰기", style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
               ),
-              const Divider(thickness: 1),
               Expanded(
                 child: StreamBuilder<List<Map<String, dynamic>>>(
                   stream: _getVisiblePostsStream(),
@@ -403,7 +409,46 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                 future: FirebaseFirestore.instance.collection('users').doc(post['userId']).get(),
                 builder: (context, userSnapshot) {
                   final userData = userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
-                  final level = userData['level'] != null ? 'LV.${userData['level']}' : 'LV.?';
+                  final List<Color> levelColors = [
+                    Color(0xFFFF0000), // 빨강
+                    Color(0xFFFF2600),
+                    Color(0xFFFF4D00),
+                    Color(0xFFFF7300),
+                    Color(0xFFFF7F00),
+                    Color(0xFFFF9933), // 주황
+
+                    Color(0xFFFFA533),
+                    Color(0xFFFFB233),
+                    Color(0xFFDAA520), // DarkGoldenrod (진한 금색)
+                    Color(0xFFB8860B), // DarkGoldenrod2
+                    Color(0xFF8B8000), // OliveDark
+                    Color(0xFF808000), // Olive
+
+                    Color(0xFF6B8E23), // OliveDrab
+                    Color(0xFF556B2F), // DarkOliveGreen
+                    Color(0xFF228B22), // ForestGreen
+                    Color(0xFF006400), // DarkGreen
+                    Color(0xFF006A4E), // Deep Green
+                    Color(0xFF008000), // Green
+
+                    Color(0xFF008B8B), // DarkCyan
+                    Color(0xFF0099CC), // Blueish Cyan
+                    Color(0xFF007BA7), // Cerulean
+                    Color(0xFF0066CC), // Strong Blue
+                    Color(0xFF0033CC),
+                    Color(0xFF0000FF), // 파랑
+
+                    Color(0xFF1B0091), // 남색
+                    Color(0xFF3400A2),
+                    Color(0xFF4B00B3),
+                    Color(0xFF6100C4),
+                    Color(0xFF7600D5),
+                    Color(0xFF8B00FF), // 보라
+                  ];
+
+                  final level = userData['level'] ?? 0;
+                  final levelColor = levelColors[(level - 1).clamp(0, levelColors.length - 1)];
+
                   final String? profileImg = userData['imgPath'];
                   final isPostWriterAdmin = userData['status'] == 'A';
 
@@ -453,7 +498,22 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                             fontSize: 12),
                                       ),
                                     )
-                                        : Text(level, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                        : Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: levelColor, width: 1),
+                                      ),
+                                      child: Text(
+                                        'Lv.$level',
+                                        style: TextStyle(
+                                          color: levelColor,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                                 Row(
@@ -650,14 +710,14 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                                           notiSettings?['like'] ?? false;
 
                                                       if (isLikeEnabled) {
-                                                        final userDoc =
-                                                        await FirebaseFirestore.instance
+
+                                                        final userDoc = await FirebaseFirestore.instance
                                                             .collection('users')
-                                                            .doc(userId)
+                                                            .doc(userId) // 좋아요 누른 사람 (현재 유저)
                                                             .get();
 
-                                                        final nickName =
-                                                            userDoc.data()?['nickName'] ?? '익명';
+                                                        final nickName = userDoc.data()?['nickName'] ?? '익명';
+                                                        final profileImage = userDoc.data()?['imgPath'] ?? '';
 
                                                         await FirebaseFirestore.instance
                                                             .collection('users')
@@ -667,7 +727,7 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                                           'notiType': 'like',
                                                           'notiMsg': '$nickName님이 게시글을 좋아합니다.',
                                                           'boardId': post['boardId'],
-                                                          'notiImg': profileImg,
+                                                          'notiImg': profileImage,
                                                           'createdAt':
                                                           FieldValue.serverTimestamp(),
                                                           'isRead': false,

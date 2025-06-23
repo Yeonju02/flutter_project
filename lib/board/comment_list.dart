@@ -188,11 +188,14 @@ class _CommentListState extends State<CommentList> with AutomaticKeepAliveClient
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance.collection('users').doc(userId).get(),
       builder: (context, userSnapshot) {
+        if (!mounted) return const SizedBox();
+
         String? imgPath;
         if (userSnapshot.hasData && userSnapshot.data!.exists) {
           final userData = userSnapshot.data!.data() as Map<String, dynamic>;
           imgPath = userData['imgPath'];
         }
+
         return CircleAvatar(
           radius: 18,
           backgroundColor: const Color(0xFFE0E0E0),
@@ -227,6 +230,10 @@ class _CommentListState extends State<CommentList> with AutomaticKeepAliveClient
         ),
         if (isMine)
           PopupMenuButton<String>(
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             onSelected: (value) {
               if (value == 'edit') {
                 onEdit();
