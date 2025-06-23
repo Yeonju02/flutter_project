@@ -24,7 +24,7 @@ class DateItem extends StatelessWidget {
         height: 58,
         margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.black : Color(0xFFF5F5F5),
+          color: isSelected ? Color(0xFF92BBE2) : Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(

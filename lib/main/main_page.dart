@@ -13,7 +13,6 @@ import '../custom/daily_mission_tab.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 
@@ -24,17 +23,16 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> with RouteAware {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  Key _calendarRefreshKey = UniqueKey(); // 달력 새로고침용
-  Key _xpBarKey = UniqueKey(); // 경험치바 새로고침용
-  Key _dailyMissionKey = UniqueKey(); // 일일미션 탭 새로고침용
+  Key _calendarRefreshKey = UniqueKey();
+  Key _xpBarKey = UniqueKey();
+  Key _dailyMissionKey = UniqueKey();
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     routeObserver.subscribe(this, ModalRoute.of(context)!);
-    _updateFcmToken(); // fcm 토큰으로 알림주기용
+    _updateFcmToken();
   }
-
 
   @override
   void dispose() {
@@ -71,7 +69,6 @@ class _MainPageState extends State<MainPage> with RouteAware {
     final fcmToken = await FirebaseMessaging.instance.getToken();
     if (fcmToken == null) return;
 
-    // userId 필드로 해당 유저의 문서 id 찾기
     final query = await FirebaseFirestore.instance
         .collection('users')
         .where('userId', isEqualTo: userId)
@@ -86,7 +83,6 @@ class _MainPageState extends State<MainPage> with RouteAware {
           .update({'fcmToken': fcmToken});
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -173,6 +169,11 @@ class _MainPageState extends State<MainPage> with RouteAware {
                             _xpBarKey = UniqueKey();
                           });
                         }
+                      },
+                      onCalendarPageChanged: (newFocusedDay) {
+                        setState(() {
+                          _focusedDay = newFocusedDay;
+                        });
                       },
                     ),
                   ),
