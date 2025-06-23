@@ -144,7 +144,7 @@ class _MainPageState extends State<MainPage> with RouteAware {
                     ),
                   ),
                   const SizedBox(height: 15),
-                  const Divider(thickness: 1),
+                  const Divider(thickness: 1, color: Colors.grey),
                   Expanded(
                     child: RoutineCalendar(
                       key: _calendarRefreshKey,
