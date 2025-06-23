@@ -47,8 +47,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   Widget build(BuildContext context) {
     final product = widget.data;
 
-    print('✅ productId: ${product['productId']}');
-
     final List<Map<String, dynamic>> colorOptions =
     List<Map<String, dynamic>>.from(product['colors'] ?? []);
     final List<String> colorList =
