@@ -67,7 +67,7 @@ class _ShopMainPageState extends State<ShopMainPage> {
         children: [
           Column(
             children: [
-              // 검색창
+
               Padding(
                 padding: const EdgeInsets.all(10),
                 child: TextField(
@@ -328,6 +328,7 @@ class _ShopMainPageState extends State<ShopMainPage> {
   }
 }
 
+// 상품 썸네일 (카드형)
 class ProductCard extends StatelessWidget {
   final Map<String, dynamic> data;
   final String productId;

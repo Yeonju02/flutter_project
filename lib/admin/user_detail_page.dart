@@ -48,6 +48,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                     : const AssetImage('assets/no_image.png') as ImageProvider,
               ),
             ),
+
             const SizedBox(height: 20),
 
             _infoTile('닉네임', data['nickName']),
@@ -100,7 +101,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
               },
               buttonStyleData: const ButtonStyleData(
                 padding: EdgeInsets.symmetric(horizontal: 12),
-                height: 40, // 높이 줄임
+                height: 40,
               ),
               dropdownStyleData: DropdownStyleData(
                 maxHeight: 200,

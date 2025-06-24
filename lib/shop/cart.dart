@@ -140,7 +140,7 @@ class _CartPageState extends State<CartPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // 체크박스 (이미지 위)
+                              // 상품 체크박스
                               Row(
                                 children: [
                                   Checkbox(
@@ -154,7 +154,6 @@ class _CartPageState extends State<CartPage> {
                                 ],
                               ),
 
-                              // 이미지
                               Stack(
                                 children: [
                                   ClipRRect(
@@ -177,13 +176,14 @@ class _CartPageState extends State<CartPage> {
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 4),
+
                               Text('${formatter.format(data['productPrice'])}원'),
                               const SizedBox(height: 4),
-                              // 색상 표시
+
                               Text('색상: ${_getColorLabel(data['selectedColor'] ?? '기본색')}'),
                               const SizedBox(height: 4),
 
-                              // 수량 조절
+                              // 상품 수량 조절
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
@@ -229,7 +229,7 @@ class _CartPageState extends State<CartPage> {
                     ),
                   ),
 
-                  // 하단 결제 요약
+                  // 하단바
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
                     child: Row(
@@ -240,7 +240,7 @@ class _CartPageState extends State<CartPage> {
                         ),
                         ElevatedButton.icon(
                           onPressed: () {
-                            // 선택된 상품 리스트 추출
+                            // 장바구니에서 선택된 상품 리스트 추출
                             final selectedItems = selectedDocs.map((doc) {
                               final data = doc.data() as Map<String, dynamic>;
                               final docId = doc.id;
@@ -251,7 +251,7 @@ class _CartPageState extends State<CartPage> {
                                 'productPrice': data['productPrice'],
                                 'thumbNail': data['thumbNail'],
                                 'quantity': quantities[docId],
-                                'selectedColor': data['selectedColor'] ?? '기본색', // 없으면 기본값 처리
+                                'selectedColor': data['selectedColor'] ?? '기본색',
                               };
                             }).toList();
 

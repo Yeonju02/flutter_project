@@ -101,7 +101,7 @@ class _UserAdminPageState extends State<UserAdminPage> {
         ],
       ),
       bottomNavigationBar: AdminBottomNavBar(
-        currentIndex: 0, // 현재 탭: 회원
+        currentIndex: 0,
         onTap: (index) {
           switch (index) {
             case 1:
