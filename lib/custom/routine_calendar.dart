@@ -151,7 +151,7 @@ class _RoutineCalendarState extends State<RoutineCalendar> {
             },
           ),
         ),
-        const Divider(thickness: 2, color: Colors.grey),
+        const Divider(thickness: 1, color: Colors.grey),
         const SizedBox(height: 8),
         Expanded(
           child: ListView.builder(

@@ -138,11 +138,57 @@ class _SignupPageState extends State<SignupPage> {
     final email = '$emailLocal@$emailDomain';
 
     try {
+      // Firebase Auth 회원가입
       final userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: pwd);
 
-      final uid = userCredential.user?.uid ?? '';
+      final user = userCredential.user;
+      if (user == null) {
+        _showToast("회원가입 실패: 사용자 생성 실패");
+        return;
+      }
 
+      // 이메일 인증 메일 전송
+      await user.sendEmailVerification();
+      _showToast("이메일 인증 메일을 보냈습니다. 이메일을 확인해주세요.");
+
+      // 이메일 인증 대기
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text("이메일 인증 확인"),
+          content: Text("이메일 인증을 완료하셨나요?\n확인 후 '네'를 눌러주세요."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text("아니요"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text("네"),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) {
+        _showToast("이메일 인증 후 다시 시도해주세요.");
+        await FirebaseAuth.instance.currentUser?.delete();
+        return;
+      }
+
+      // 인증 여부 재확인
+      await user.reload();
+      final refreshedUser = FirebaseAuth.instance.currentUser;
+      if (refreshedUser == null || !refreshedUser.emailVerified) {
+        _showToast("이메일 인증이 아직 완료되지 않았습니다.");
+        await FirebaseAuth.instance.currentUser?.delete();
+        return;
+      }
+
+      final uid = refreshedUser.uid;
+
+      // Firestore에 유저 정보 저장
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'userId': userId,
         'nickName': nick,
@@ -156,15 +202,16 @@ class _SignupPageState extends State<SignupPage> {
         'notiEnable': true,
         'address': '',
         'imgPath': '',
-        'status' : 'U'
+        'status': 'U'
       });
 
-      _showToast("회원가입 완료!");
+      _showToast("회원가입 완료");
       Navigator.pop(context);
     } catch (e) {
       _showToast("회원가입 실패: ${e.toString()}");
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
