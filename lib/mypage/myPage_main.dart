@@ -799,6 +799,14 @@ class _MyPageMainState extends State<MyPageMain> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(content: Text("회원 탈퇴가 완료되었습니다.")),
                                 );
+                                await FirebaseAuth.instance.signOut();
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.clear();
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => LoginPage()),
+                                      (route) => false,
+                                );
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(content: Text("비밀번호가 올바르지 않습니다.")),
@@ -926,6 +934,7 @@ class _MyPageMainState extends State<MyPageMain> {
   }
 
 
+  // 회원의 delete를 true(탈퇴한 유저)로 변경
   Future<bool> _tryDeleteAccount(String password) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
