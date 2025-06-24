@@ -84,6 +84,10 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _handleGoogleLogin() async {
     try {
+      // 먼저 기존 계정 로그아웃
+      await GoogleSignIn().signOut();
+
+      // 그 다음 로그인 시도 → 항상 계정 선택창이 뜸
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) {
         _showToast("구글 로그인이 취소되었습니다.");
@@ -97,8 +101,7 @@ class _LoginPageState extends State<LoginPage> {
         idToken: googleAuth.idToken,
       );
 
-      UserCredential userCredential =
-      await FirebaseAuth.instance.signInWithCredential(credential);
+      UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
       User? user = userCredential.user;
 
       if (user != null) {
