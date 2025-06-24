@@ -227,11 +227,50 @@ class _NewRoutineSheetState extends State<NewRoutineSheet> {
                     const Icon(Icons.access_time, size: 20),
                     const SizedBox(width: 6),
                     Text(endStr, style: const TextStyle(fontSize: 16)),
+                    const SizedBox(width: 40),
+                    GestureDetector(
+                      onLongPress: () {
+                        final overlay = Overlay.of(context);
+                        final overlayEntry = OverlayEntry(
+                          builder: (context) => Positioned(
+                            top: MediaQuery.of(context).size.height * 0.6,
+                            left: 30,
+                            right: 30,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black87,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  '루틴 끝나는시간 기준 10분 이내로 체크해주셔야\n루틴 수행 성공으로 인정됩니다.',
+                                  style: TextStyle(color: Colors.white, fontSize: 14),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+
+                        overlay.insert(overlayEntry);
+                        Future.delayed(const Duration(seconds: 3), () {
+                          overlayEntry.remove();
+                        });
+                      },
+                      child: const CircleAvatar(
+                        radius: 8,
+                        backgroundColor: Color(0xFF92BBE2),
+                        child: Icon(Icons.question_mark, size: 10, color: Colors.white),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
+
           if (showTimeError)
             Padding(
               padding: const EdgeInsets.only(top: 8),
