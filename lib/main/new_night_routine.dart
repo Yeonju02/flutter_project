@@ -198,18 +198,14 @@ class _NewNightRoutineSheetState extends State<NewNightRoutineSheet> {
                   },
                   child: Row(
                     children: [
-                      const Icon(Icons.access_time,
-                          size: 20, color: Colors.white),
+                      const Icon(Icons.access_time, size: 20, color: Colors.white),
                       const SizedBox(width: 6),
-                      Text(startStr,
-                          style: const TextStyle(
-                              fontSize: 16, color: Colors.white)),
+                      Text(startStr, style: const TextStyle(fontSize: 16, color: Colors.white)),
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text('~',
-                    style: TextStyle(fontSize: 18, color: Colors.white)),
+                const Text('~', style: TextStyle(fontSize: 18, color: Colors.white)),
                 const SizedBox(width: 12),
                 GestureDetector(
                   onTap: () {
@@ -225,17 +221,52 @@ class _NewNightRoutineSheetState extends State<NewNightRoutineSheet> {
                   },
                   child: Row(
                     children: [
-                      const Icon(Icons.access_time,
-                          size: 20, color: Colors.white),
+                      const Icon(Icons.access_time, size: 20, color: Colors.white),
                       const SizedBox(width: 6),
-                      Text(endStr,
-                          style: const TextStyle(
-                              fontSize: 16, color: Colors.white)),
+                      Text(endStr, style: const TextStyle(fontSize: 16, color: Colors.white)),
+                      const SizedBox(width: 40),
+                      GestureDetector(
+                        onLongPress: () {
+                          final overlay = Overlay.of(context);
+                          final overlayEntry = OverlayEntry(
+                            builder: (context) => Positioned(
+                              top: MediaQuery.of(context).size.height * 0.6,
+                              left: 30,
+                              right: 30,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black87,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    '루틴 끝나는시간 기준 10분 이내로 체크해주셔야\n루틴 수행 성공으로 인정됩니다.',
+                                    style: TextStyle(color: Colors.white, fontSize: 14),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                          overlay.insert(overlayEntry);
+                          Future.delayed(const Duration(seconds: 3), () {
+                            overlayEntry.remove();
+                          });
+                        },
+                        child: const CircleAvatar(
+                          radius: 10,
+                          backgroundColor: Colors.white,
+                          child: Icon(Icons.question_mark, size: 12, color: Colors.black),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
+
             if (showInvalidNightTimeError)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
