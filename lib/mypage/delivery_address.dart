@@ -32,7 +32,7 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
 
     return snapshot.docs.map((doc) {
       final data = doc.data();
-      data['docId'] = doc.id; // 문서 ID 포함
+      data['docId'] = doc.id;
       return data;
     }).toList();
   }
@@ -51,7 +51,7 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
       });
     }
 
-    setState(() {}); // 변경 사항 UI 반영
+    setState(() {});
   }
 
   // 배송지 목록 보여주기
@@ -90,7 +90,6 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 헤더
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -225,8 +224,6 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                                 .collection('users')
                                 .doc(user!.uid)
                                 .collection('address');
-
-                            // 기존 주소가 하나도 없으면 처음 추가하는 주소이므로 isDefault = true
                             final snapshot = await addressRef.get();
                             final isFirst = snapshot.docs.isEmpty;
 
@@ -236,7 +233,7 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                               'address': addressController.text.trim(),
                               'request': selectedRequest ?? '',
                               'gatePassword': isGatePasswordSelected ? passwordController.text.trim() : '없음',
-                              'isDefault': isFirst,  // 처음이면 true, 아니면 false
+                              'isDefault': isFirst,
                               'createdAt': Timestamp.now(),
                             };
 
@@ -267,7 +264,7 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
     setState(() {});
   }
 
-  // 2. 수정 다이얼로그 함수
+  // 배송지 수정 다이얼로그
   void showEditAddressDialog(Map<String, dynamic> addressData, String docId) {
     final nameController = TextEditingController(text: addressData['name']);
     final phoneController = TextEditingController(text: addressData['phone']);
@@ -319,7 +316,6 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                         ],
                       ),
 
-                      // 이름 입력
                       TextField(
                         controller: nameController,
                         decoration: InputDecoration(
@@ -330,7 +326,6 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                       ),
                       SizedBox(height: 20),
 
-                      // 전화번호 입력
                       TextField(
                         controller: phoneController,
                         decoration: InputDecoration(
@@ -342,7 +337,6 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                       ),
                       SizedBox(height: 20),
 
-                      // 주소 입력
                       TextField(
                         controller: addressController,
                         decoration: InputDecoration(
@@ -353,7 +347,7 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                       ),
                       SizedBox(height: 20),
 
-                      // 배송 요청사항 라디오 그룹
+
                       Text(
                         '배송 요청사항',
                         style: TextStyle(color: Color(0xFF92BBE2),
@@ -375,7 +369,7 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                       }).toList(),
                       SizedBox(height: 16),
 
-                      // 공동 현관 비밀번호 선택 라디오
+
                       Text(
                         '공동 현관 출입',
                         style: TextStyle(color: Color(0xFF92BBE2),
@@ -423,7 +417,7 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
 
                       SizedBox(height: 24),
 
-                      // 저장하기 버튼
+
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -489,7 +483,6 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                       SizedBox(
                         width: double.infinity,
                         child: TextButton(
-                          // 삭제 버튼 onPressed 부분 수정
                           onPressed: () async {
                             final confirm = await showDialog<bool>(
                               context: context,
@@ -515,25 +508,21 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                                   .doc(user!.uid)
                                   .collection('address');
 
-                              // 현재 삭제하려는 주소가 기본 배송지인지 확인
                               final docSnapshot = await addressCollection.doc(docId).get();
                               final isDefault = docSnapshot.data()?['isDefault'] == true;
-
-                              // 삭제
                               await addressCollection.doc(docId).delete();
 
                               if (isDefault) {
-                                // 남은 배송지 중 가장 첫 번째 문서 가져오기
+
                                 final remainingAddresses = await addressCollection.get();
 
                                 if (remainingAddresses.docs.isNotEmpty) {
                                   final firstDoc = remainingAddresses.docs.first;
-                                  // 기본 배송지로 변경
                                   await addressCollection.doc(firstDoc.id).update({'isDefault': true});
                                 }
                               }
 
-                              Navigator.pop(context);  // 모달 닫기
+                              Navigator.pop(context);
                               setState(() {});
                             }
                           },
@@ -588,7 +577,6 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                 })
                     .toList();
 
-                // 기본 배송지 위로 정렬
                 addresses.sort((a, b) {
                   if (a['isDefault'] == true) return -1;
                   if (b['isDefault'] == true) return 1;
@@ -603,7 +591,7 @@ class _DeliveryAddressState extends State<DeliveryAddress> {
                   child: Column(
                     children: [
                       if (addresses.isEmpty) ...[
-                        SizedBox(height: 100), // 약간 위쪽 띄우기용
+                        SizedBox(height: 100),
                         Text(
                           '등록된 배송지가 없습니다.',
                           style: TextStyle(fontSize: 16, color: Colors.grey),

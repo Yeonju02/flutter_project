@@ -46,11 +46,9 @@ class _MyPageMainState extends State<MyPageMain> {
   late List<Widget> tabContents = [];
   int selectedDeliveryTab = 0;
 
-  // 유저 정보 편집 기능
+  // 유저 정보 편집(닉네임, 이메일)
   final TextEditingController nicknameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
-
-  // final TextEditingController addressController = TextEditingController();
 
   // 환경설정의 토글버튼 true/false
   bool commentNotification = true;
@@ -98,7 +96,7 @@ class _MyPageMainState extends State<MyPageMain> {
         }
       }
     }
-    // 해당 색상 이미지 없으면 첫번째 색상 이미지 반환
+    // 해당 색상 이미지 없으면 첫번째 색상 이미지로
     return (colorsList[0]['imgPath'] ?? '').toString().trim();
   }
 
@@ -249,7 +247,6 @@ class _MyPageMainState extends State<MyPageMain> {
     List<Map<String, dynamic>> result = [];
 
     for (String productId in myProductIds) {
-      // 모든 리뷰 문서 조회
       final reviewSnapshot = await FirebaseFirestore.instance
           .collection('products')
           .doc(productId)
@@ -333,7 +330,6 @@ class _MyPageMainState extends State<MyPageMain> {
         continue;
       }
 
-      // 날짜 키를 보기 좋게 포맷팅 (예: "2025년 6월 20일")
       final key = "${date.year}년 ${date.month}월 ${date.day}일";
 
       if (!grouped.containsKey(key)) {
@@ -565,18 +561,18 @@ class _MyPageMainState extends State<MyPageMain> {
     final completed = await fetchCompletedOrderList();
 
     setState(() {
-      orderList = [...pending, ...completed]; // 여기서 잘 할당되었는지
+      orderList = [...pending, ...completed];
       isLoading = false;
     });
   }
 
 
 
-  // 1. 프로필 편집 다이얼로그 상태 변수
-  XFile? pickedImage; // 이미지 저장
-  String? originalImagePath; // 이미지 미리보기
+  // 프로필 편집 다이얼로그 상태 변수
+  XFile? pickedImage;
+  String? originalImagePath;
 
-  // 2. 이미지 선택 함수 (Firebase 업로드 X)
+  // 이미지 선택
   Future<void> pickImageOnly(
       void Function(void Function()) setDialogState) async {
     final picker = ImagePicker();
@@ -600,21 +596,17 @@ class _MyPageMainState extends State<MyPageMain> {
         user.uid);
     final settingsDocRef = userDocRef.collection('notiSettings').doc('main');
 
-    // notiEnable은 이미 생성된 값이라 그대로 가져옴
     final userDoc = await userDocRef.get();
     final userData = userDoc.data();
     notiEnabled = userData?['notiEnable'] ?? true;
 
-    // notiSettings 문서 확인
     final settingsDoc = await settingsDocRef.get();
 
     if (settingsDoc.exists) {
-      // 기존 데이터 불러오기
       final settingsData = settingsDoc.data();
       commentNotification = settingsData?['comment'] ?? true;
       likeNotification = settingsData?['like'] ?? true;
     } else {
-      // 문서 없으면 기본값 생성
       commentNotification = true;
       likeNotification = true;
 
@@ -893,7 +885,7 @@ class _MyPageMainState extends State<MyPageMain> {
 
                         await FirebaseAuth.instance.signOut();
                         final prefs = await SharedPreferences.getInstance();
-                        await prefs.clear(); // 모든 저장된 데이터를 제거
+                        await prefs.clear();
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(builder: (context) => LoginPage()),
@@ -1252,7 +1244,6 @@ class _MyPageMainState extends State<MyPageMain> {
           SizedBox(height: 20),
           GestureDetector(
             onTap: () {
-              // 커뮤니티 게시판 페이지로 이동 (예시)
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => BoardMainScreen()),
@@ -1303,7 +1294,6 @@ class _MyPageMainState extends State<MyPageMain> {
             ),
             child: Row(
               children: [
-                // 텍스트 영역
                 Expanded(
                   flex: 2,
                   child: Padding(
@@ -1345,7 +1335,6 @@ class _MyPageMainState extends State<MyPageMain> {
                   ),
                 ),
 
-                // 썸네일 영역
                 ClipRRect(
                   borderRadius: BorderRadius.only(
                     topRight: Radius.circular(12),
@@ -1380,7 +1369,7 @@ class _MyPageMainState extends State<MyPageMain> {
                 bottomRight: Radius.circular(12),
               ),
               child: Container(
-                height: 150, // 오버레이 박스 높이 조절
+                height: 150,
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.5),
                 ),
@@ -1442,7 +1431,6 @@ class _MyPageMainState extends State<MyPageMain> {
 
               return Stack(
                 children: [
-                  // 움직이는 흰색 박스
                   AnimatedPositioned(
                     duration: Duration(milliseconds: 250),
                     curve: Curves.easeInOut,
@@ -1572,7 +1560,6 @@ class _MyPageMainState extends State<MyPageMain> {
   Widget buildGroupedPendingOrders(List<Map<String, dynamic>> orders) {
     final groupedOrders = groupPendingOrdersByDate(orders);
 
-    // 최신 날짜가 위로 오게 정렬
     final sortedEntries = groupedOrders.entries.toList()
       ..sort((a, b) => b.key.compareTo(a.key));
 
@@ -1607,7 +1594,6 @@ class _MyPageMainState extends State<MyPageMain> {
 
     Color _statusColor(String target) {
       if (status == '배송중') {
-        // 배송중일 때는 '결제완료'와 '배송중' 둘 다 검정색
         if (target == '결제완료' || target == '배송중') {
           return Colors.black;
         } else {
@@ -1615,7 +1601,6 @@ class _MyPageMainState extends State<MyPageMain> {
         }
       }
 
-      // 그 외는 상태와 같을 때만 검정, 아니면 회색
       return status == target ? Colors.black : Colors.grey.shade300;
     }
 
@@ -1757,12 +1742,11 @@ class _MyPageMainState extends State<MyPageMain> {
   Widget buildGroupedCompletedOrders(List<Map<String, dynamic>> orders) {
     final groupedOrders = groupOrdersByDate(orders);
 
-    // 날짜 문자열을 DateTime으로 변환하여 정렬
     final sortedEntries = groupedOrders.entries.toList()
       ..sort((a, b) {
         DateTime dateA = DateFormat('yyyy년 M월 d일').parse(a.key);
         DateTime dateB = DateFormat('yyyy년 M월 d일').parse(b.key);
-        return dateB.compareTo(dateA); // 내림차순 (최신 날짜 위)
+        return dateB.compareTo(dateA);
       });
 
     return ListView(
@@ -1812,9 +1796,6 @@ class _MyPageMainState extends State<MyPageMain> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text("배송 완료", style: TextStyle(fontSize: 12)),
-              // if (formattedDate.isNotEmpty)
-              //   Text("배송 완료 날짜: $formattedDate",
-              //       style: TextStyle(fontSize: 12, color: Colors.grey[700])),
             ],
           ),
 
@@ -1890,7 +1871,7 @@ class _MyPageMainState extends State<MyPageMain> {
           else
             Center(
               child: ElevatedButton(
-                onPressed: null, // 비활성화
+                onPressed: null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.grey.shade300,
                   foregroundColor: Colors.grey.shade600,
@@ -1924,7 +1905,7 @@ class _MyPageMainState extends State<MyPageMain> {
         final reviews = snapshot.data!;
         final groupedReviews = groupReviewsByDate(reviews);
         final sortedDates = groupedReviews.keys.toList()
-          ..sort((a, b) => b.compareTo(a)); // 최신 날짜부터
+          ..sort((a, b) => b.compareTo(a));
 
         return ListView.builder(
           itemCount: sortedDates.length,
@@ -2703,7 +2684,6 @@ class _MyPageMainState extends State<MyPageMain> {
           trailing: Icon(Icons.chevron_right, color: Colors.grey),
           onTap: onTap,
         ),
-        // Divider(),
       ],
     );
   }
@@ -2905,7 +2885,6 @@ class _MyPageMainState extends State<MyPageMain> {
 
                           SizedBox(height: 8),
 
-                          // 포인트 아이콘 + 숫자
                           Row(
                             children: [
                               Container(
