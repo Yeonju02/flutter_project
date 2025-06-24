@@ -68,6 +68,7 @@ class _UserAdminPageState extends State<UserAdminPage> {
           const SizedBox(height: 10),
           _buildSearchBar(),
           _buildFilterDropdown(),
+          SizedBox(height: 10),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: query.snapshots(),
