@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 class PrivacyPolicyPage extends StatelessWidget {
   const PrivacyPolicyPage({super.key});
 
-  // 제목은 카드 바깥, 내용만 카드 안에 넣기
   Widget _buildPolicySection(String title, String content) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
