@@ -28,12 +28,12 @@ class PortPay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IamportPayment(
-      appBar: AppBar(title: const Text('포트원 V1 결제')),
+      appBar: AppBar(title: const Text('루틴로그 상품 결제'), backgroundColor: Colors.white,),
       initialChild: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset('assets/logo.png'),
+            Image.asset('assets/logo.png', height: 200,),
             const SizedBox(height: 15),
             const Text('잠시만 기다려주세요...', style: TextStyle(fontSize: 20)),
           ],
