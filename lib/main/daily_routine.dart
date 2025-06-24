@@ -175,7 +175,12 @@ class _DailyRoutineState extends State<DailyRoutine> with TickerProviderStateMix
     final docId = item['docId'];
     final deadline = _addMinutes(endTime, 10);
     final deadlineMinutes = _toMinutes(deadline);
-    final isLate = nowMinutes > deadlineMinutes;
+    bool isLate = false;
+    if (selectedDay.isBefore(today)) {
+      isLate = true;
+    } else {
+      isLate = nowMinutes > deadlineMinutes;
+    }
 
     final willBeChecked = !isCheckedList[index];
     int baseXP = willBeChecked ? (isLate ? 0 : 10) : 0;

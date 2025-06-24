@@ -18,7 +18,7 @@ class RecommendNightRoutineBox extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF2E2F42), // 어두운 배경
+        color: const Color(0xFF2E2F42),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.white24),
       ),
@@ -57,7 +57,7 @@ class RecommendNightRoutineBox extends StatelessWidget {
                 child: const Text(
                   '적용하기',
                   style: TextStyle(
-                    color: Color(0xFF90CAF9), // 연한 파랑
+                    color: Color(0xFF90CAF9),
                     fontWeight: FontWeight.w500,
                     fontSize: 13,
                   ),
