@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../login/login_page.dart';
 import '../board/board_main_screen.dart';
+import '../board/board_detail_screen.dart';
 import '../main/main_page.dart';
 import '../shop/shop_main.dart';
 import '../admin/admin_user_page.dart';
@@ -698,6 +699,7 @@ class _MyPageMainState extends State<MyPageMain> {
         thumbnailPath = thumbQuery.docs.first.data()['filePath'] as String?;
       }
 
+
       postsWithThumb.add({
         'id': doc.id,
         ...postData,
@@ -1235,6 +1237,7 @@ class _MyPageMainState extends State<MyPageMain> {
     );
   }
 
+  // 내가 올린 게시물이 없을 경우
   Widget _buildEmptyPostView() {
     return Center(
       child: Column(
@@ -1276,94 +1279,126 @@ class _MyPageMainState extends State<MyPageMain> {
     );
   }
 
+  // 내가 올린 게시물이 있을 경우
   Widget _buildPostItem(Map<String, dynamic> post) {
+    final bool isDeleted = post['isDeleted'] == true;
+
     return GestureDetector(
       onTap: () {
+        if (isDeleted) return;
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => BoardMainScreen()),
+          MaterialPageRoute(builder: (context) => BoardDetailScreen(boardId: post['id'])),
         );
       },
-      child: Container(
-        margin: EdgeInsets.only(bottom: 16),
-        height: 150,
-        decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-                color: Colors.grey[200]!,
-                width: 1
-            )
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 12),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      post['title'] ?? '',
-                      style: TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: 15),
-                    Text(
-                      post['content'] ?? '',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(height: 1.4),
-                    ),
-                    SizedBox(height: 10),
-                    Row(
+      child: Stack(
+        children: [
+          Container(
+            margin: EdgeInsets.only(bottom: 16),
+            height: 150,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[200]!, width: 1),
+            ),
+            child: Row(
+              children: [
+                // 텍스트 영역
+                Expanded(
+                  flex: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _formatDate(post['createdAt']),
-                          style: TextStyle(color: Colors.grey[600]),
+                          post['title'] ?? '',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(width: 12),
-                        Icon(Icons.favorite, size: 16, color: Colors.grey),
-                        SizedBox(width: 4),
-                        Text('${post['likeCount'] ?? 0}'),
+                        SizedBox(height: 15),
+                        Text(
+                          post['content'] ?? '',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(height: 1.4),
+                        ),
+                        SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Text(
+                              _formatDate(post['createdAt']),
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                            SizedBox(width: 12),
+                            Icon(Icons.favorite, size: 16, color: Colors.grey),
+                            SizedBox(width: 4),
+                            Text('${post['likeCount'] ?? 0}'),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
+                  ),
+                ),
+
+                // 썸네일 영역
+                ClipRRect(
+                  borderRadius: BorderRadius.only(
+                    topRight: Radius.circular(12),
+                    bottomRight: Radius.circular(12),
+                  ),
+                  child: (post['thumbnail'] != null &&
+                      post['thumbnail'].toString().isNotEmpty)
+                      ? Image.network(
+                    post['thumbnail'],
+                    width: 150,
+                    height: double.infinity,
+                    fit: BoxFit.cover,
+                  )
+                      : Container(
+                    width: 100,
+                    height: double.infinity,
+                    color: Colors.grey[300],
+                    child: Icon(Icons.image_not_supported,
+                        color: Colors.grey[600]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          if (isDeleted)
+            ClipRRect(
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+              child: Container(
+                height: 150, // 오버레이 박스 높이 조절
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '관리자가 삭제한 게시글입니다.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
-
-            ClipRRect(
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(12),
-                bottomRight: Radius.circular(12),
-              ),
-              child: (post['thumbnail'] != null && post['thumbnail'] != '')
-                  ? Image.network(
-                post['thumbnail'],
-                width: 150,
-                height: double.infinity,
-                fit: BoxFit.cover,
-              )
-                  : Container(
-                width: 100,
-                height: double.infinity,
-                color: Colors.grey[300],
-                child: Icon(Icons.image_not_supported,
-                    color: Colors.grey[600]),
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
-
 
 
   /////// - 주문 내역 - ///////
@@ -2678,6 +2713,8 @@ class _MyPageMainState extends State<MyPageMain> {
     if (userData == null) {
       return Center(child: CircularProgressIndicator());
     }
+    int streak = userData?['streakCount'] ?? 0;
+    int expPercent = streak == 0 ? 0 : (streak >= 5 ? 50 : streak * 10);
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -2743,22 +2780,140 @@ class _MyPageMainState extends State<MyPageMain> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            userData!['nickName'] ?? '',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 4),
-                          Text(userData!['userEmail'] ?? ''),
-                          SizedBox(height: 8),
                           Row(
                             children: [
-                              // 동그라미 안에 P 문자 아이콘
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      userData!['nickName'] ?? '',
+                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(userData!['userEmail'] ?? ''),
+                                  ],
+                                ),
+                              ),
+
+                              IconButton(
+                                padding: EdgeInsets.zero,
+                                constraints: BoxConstraints(),
+                                icon: Icon(Icons.edit, color: Colors.black),
+                                onPressed: () async {
+                                  originalImagePath = userData?['imgPath'];
+                                  pickedImage = null;
+                                  await fetchUserData();
+
+                                  showGeneralDialog(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    barrierLabel: "프로필 편집",
+                                    transitionDuration: Duration(milliseconds: 300),
+                                    pageBuilder: (context, animation, secondaryAnimation) {
+                                      return Center(
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: StatefulBuilder(
+                                            builder: (context, setDialogState) {
+                                              return Dialog(
+                                                backgroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                elevation: 10,
+                                                insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+                                                child: buildProfileEditContent(context, setDialogState),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    transitionBuilder: (context, animation, secondaryAnimation, child) {
+                                      final curvedValue = Curves.easeOut.transform(animation.value);
+                                      return Transform.translate(
+                                        offset: Offset(0, 50 * (1 - curvedValue)),
+                                        child: Opacity(
+                                          opacity: curvedValue,
+                                          child: child,
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              RichText(
+                                text: TextSpan(
+                                  style: TextStyle(color: Colors.black),
+                                  children: [
+                                    TextSpan(text: '현재 연속 달성 : '),
+                                    TextSpan(
+                                      text: '$streak',
+                                      style: TextStyle(
+                                        color: Color(0xFF90ACD3),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                    TextSpan(text: ' 일'),
+                                  ],
+                                ),
+                              ),
+
+                              SizedBox(width: 20,),
+
+                              if (streak > 0)
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: Radius.circular(30),
+                                      topRight: Radius.circular(30),
+                                      bottomLeft: Radius.circular(0),
+                                      bottomRight: Radius.circular(30),
+                                    ),
+                                    border: Border.all(
+                                      color: Color(0xFF90ACD3).withOpacity(0.3),
+                                      width: 2
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Color(0xFF90ACD3).withOpacity(0.3),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 0),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    '경험치 획득량 +$expPercent%',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF90ACD3),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+
+                          SizedBox(height: 8),
+
+                          // 포인트 아이콘 + 숫자
+                          Row(
+                            children: [
                               Container(
                                 width: 24,
                                 height: 24,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Color(0xFF90ACD3), // 포인트 컬러
+                                  color: Color(0xFF90ACD3),
                                 ),
                                 child: Center(
                                   child: Text(
@@ -2786,54 +2941,7 @@ class _MyPageMainState extends State<MyPageMain> {
                           ),
                         ],
                       ),
-                    ),
-
-                    IconButton(
-                      icon: Icon(Icons.edit, color: Colors.black),
-                      onPressed: () async {
-                        originalImagePath = userData?['imgPath'];
-                        pickedImage = null;
-
-                        await fetchUserData();
-
-                        showGeneralDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          barrierLabel: "프로필 편집",
-                          transitionDuration: Duration(milliseconds: 300),
-                          pageBuilder: (context, animation, secondaryAnimation) {
-                            return Center(
-                              child: Material(
-                                color: Colors.transparent,
-                                child: StatefulBuilder(
-                                  builder: (context, setDialogState) {
-                                    return Dialog(
-                                      backgroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      elevation: 10,
-                                      insetPadding: const EdgeInsets.symmetric(horizontal: 40),
-                                      child: buildProfileEditContent(context, setDialogState),
-                                    );
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                          transitionBuilder: (context, animation, secondaryAnimation, child) {
-                            final curvedValue = Curves.easeOut.transform(animation.value);
-                            return Transform.translate(
-                              offset: Offset(0, 50 * (1 - curvedValue)),
-                              child: Opacity(
-                                opacity: curvedValue,
-                                child: child,
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
+                    )
 
                   ],
                 ),
