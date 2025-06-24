@@ -188,7 +188,7 @@ class _AdminProductPageState extends State<AdminProductPage> {
                         context,
                         MaterialPageRoute(builder: (_) => const AddProductPage()),
                       ).then((_) {
-                        // 돌아오고 나서 상품 다시 불러오기
+                        // 상품 추가 후 뒤로가기 눌렀을 때 상품 리스트 다시 불러오기
                         _fetchProducts();
                       });
                     },
@@ -303,7 +303,7 @@ class _AdminProductPageState extends State<AdminProductPage> {
         ),
       ),
       bottomNavigationBar: AdminBottomNavBar(
-        currentIndex: 3, // 현재 탭: 회원
+        currentIndex: 3, 
         onTap: (index) {
           switch (index) {
             case 0:

@@ -86,7 +86,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   onPressed: () async {
                     if (userId == null) return;
 
-                    // 🔍 userId 기준으로 문서 찾기
                     final query = await FirebaseFirestore.instance
                         .collection('users')
                         .where('userId', isEqualTo: userId)
@@ -121,10 +120,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     final existing = await cartRef.doc(cartDocId).get();
 
                     if (existing.exists) {
-                      // 이미 있으면 수량만 증가
+                      // 상품이 장바구니에 이미 있으면 수량만 증가
                       await cartRef.doc(cartDocId).update({
                         'quantity': FieldValue.increment(quantity),
-                        'addedAt': Timestamp.now(), // 최근 담은 시간 갱신
+                        'addedAt': Timestamp.now(),
                       });
                     } else {
                       // 없으면 새로 저장
@@ -198,7 +197,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ),
             const SizedBox(height: 16),
 
-            // 이름
+            // 상품 정보
             Text(product['productName'],
                 style:
                 const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
@@ -282,13 +281,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 for (var doc in docs) {
                   final score = (doc['score'] ?? 0).toDouble();
                   totalScore += score;
-                }
-
-                final avg = docs.isEmpty ? 0 : totalScore / docs.length;
-
-                String maskId(String id) {
-                  if (id.length <= 4) return id;
-                  return id.substring(0, 4) + '*' * (id.length - 4);
                 }
 
                 return Column(
@@ -425,6 +417,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     );
   }
 
+  // 리뷰 집계
   Widget buildRatingSummary(List<QueryDocumentSnapshot> docs) {
     final Map<int, int> ratingCounts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0};
 

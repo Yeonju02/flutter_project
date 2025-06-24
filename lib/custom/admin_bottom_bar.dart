@@ -16,7 +16,7 @@ class AdminBottomNavBar extends StatelessWidget {
       backgroundColor: Colors.white,
       currentIndex: currentIndex,
       type: BottomNavigationBarType.fixed,
-      selectedItemColor: null, // 이미지로 표현하므로 컬러 X
+      selectedItemColor: null,
       unselectedItemColor: null,
       showSelectedLabels: true,
       showUnselectedLabels: true,
