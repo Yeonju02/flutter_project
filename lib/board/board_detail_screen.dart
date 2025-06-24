@@ -182,6 +182,15 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
     }
   }
 
+  final List<Color> levelColors = [
+    Color(0xFFFF0000), Color(0xFFFF2600), Color(0xFFFF4D00), Color(0xFFFF7300), Color(0xFFFF7F00),
+    Color(0xFFFF9933), Color(0xFFFFA533), Color(0xFFFFB233), Color(0xFFDAA520), Color(0xFFB8860B),
+    Color(0xFF8B8000), Color(0xFF808000), Color(0xFF6B8E23), Color(0xFF556B2F), Color(0xFF228B22),
+    Color(0xFF006400), Color(0xFF006A4E), Color(0xFF008000), Color(0xFF008B8B), Color(0xFF0099CC),
+    Color(0xFF007BA7), Color(0xFF0066CC), Color(0xFF0033CC), Color(0xFF0000FF), Color(0xFF1B0091),
+    Color(0xFF3400A2), Color(0xFF4B00B3), Color(0xFF6100C4), Color(0xFF7600D5), Color(0xFF8B00FF),
+  ];
+
   @override
   Widget build(BuildContext context) {
     if (myNickName == null) {
@@ -227,9 +236,11 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                         future: FirebaseFirestore.instance.collection('users').doc(data['userId']).get(),
                         builder: (context, userSnapshot) {
                           String? profileImg;
+                          int? userLevel;
                           if (userSnapshot.hasData && userSnapshot.data!.exists) {
                             final userData = userSnapshot.data!.data() as Map<String, dynamic>;
                             profileImg = userData['imgPath'];
+                            userLevel = userData['level'];
                           }
 
                           return StreamBuilder<DocumentSnapshot>(
@@ -259,7 +270,35 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                                                 : null,
                                           ),
                                           const SizedBox(width: 8),
-                                          Text(data['nickName'] ?? '익명', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                data['nickName'] ?? '익명',
+                                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              if (userLevel != null)
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    border: Border.all(
+                                                      color: levelColors[userLevel.clamp(0, 29)],
+                                                      width: 1,
+                                                    ),
+                                                    borderRadius: BorderRadius.circular(20),
+                                                  ),
+                                                  child: Text(
+                                                    'Lv.$userLevel',
+                                                    style: TextStyle(
+                                                      color: levelColors[userLevel.clamp(0, 29)],
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
                                         ],
                                       ),
                                       Row(

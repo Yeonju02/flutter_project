@@ -21,6 +21,14 @@ class CommentList extends StatefulWidget {
 
 class _CommentListState extends State<CommentList> with AutomaticKeepAliveClientMixin {
   final Map<String, bool> expandedStates = {};
+  final List<Color> levelColors = [
+    Color(0xFFFF0000), Color(0xFFFF2600), Color(0xFFFF4D00), Color(0xFFFF7300), Color(0xFFFF7F00),
+    Color(0xFFFF9933), Color(0xFFFFA533), Color(0xFFFFB233), Color(0xFFDAA520), Color(0xFFB8860B),
+    Color(0xFF8B8000), Color(0xFF808000), Color(0xFF6B8E23), Color(0xFF556B2F), Color(0xFF228B22),
+    Color(0xFF006400), Color(0xFF006A4E), Color(0xFF008000), Color(0xFF008B8B), Color(0xFF0099CC),
+    Color(0xFF007BA7), Color(0xFF0066CC), Color(0xFF0033CC), Color(0xFF0000FF), Color(0xFF1B0091),
+    Color(0xFF3400A2), Color(0xFF4B00B3), Color(0xFF6100C4), Color(0xFF7600D5), Color(0xFF8B00FF),
+  ];
 
   @override
   bool get wantKeepAlive => true;
@@ -38,9 +46,7 @@ class _CommentListState extends State<CommentList> with AutomaticKeepAliveClient
   Widget build(BuildContext context) {
     super.build(context);
 
-    if (widget.boardId.isEmpty) {
-      return const Text('boardId가 비어있습니다.');
-    }
+    if (widget.boardId.isEmpty) return const Text('boardId가 비어있습니다.');
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -80,7 +86,7 @@ class _CommentListState extends State<CommentList> with AutomaticKeepAliveClient
 
             commentWidgets.add(
               Padding(
-                padding: const EdgeInsets.fromLTRB(32.0, 12, 12, 12),
+                padding: const EdgeInsets.fromLTRB(32, 12, 12, 12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -90,7 +96,7 @@ class _CommentListState extends State<CommentList> with AutomaticKeepAliveClient
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildCommentHeader(data, timeAgo, updatedAt, isMine, () {
+                          _buildCommentHeaderFromUser(userId, timeAgo, updatedAt, isMine, () {
                             widget.onEdit?.call(reply.id, data['content']);
                           }, () {
                             _deleteComment(reply.id);
@@ -111,7 +117,7 @@ class _CommentListState extends State<CommentList> with AutomaticKeepAliveClient
                 ),
               ),
             );
-            renderReplies(reply.id.toString());
+            renderReplies(reply.id);
           }
         }
 
@@ -135,7 +141,7 @@ class _CommentListState extends State<CommentList> with AutomaticKeepAliveClient
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildCommentHeader(data, timeAgo, updatedAt, isMine, () {
+                        _buildCommentHeaderFromUser(userId, timeAgo, updatedAt, isMine, () {
                           widget.onEdit?.call(parent.id, data['content']);
                         }, () {
                           _deleteComment(parent.id);
@@ -187,66 +193,76 @@ class _CommentListState extends State<CommentList> with AutomaticKeepAliveClient
   Widget _buildUserAvatar(String userId) {
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance.collection('users').doc(userId).get(),
-      builder: (context, userSnapshot) {
-        if (!mounted) return const SizedBox();
-
+      builder: (context, snapshot) {
         String? imgPath;
-        if (userSnapshot.hasData && userSnapshot.data!.exists) {
-          final userData = userSnapshot.data!.data() as Map<String, dynamic>;
-          imgPath = userData['imgPath'];
+        if (snapshot.hasData && snapshot.data!.exists) {
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          imgPath = data['imgPath'];
         }
 
         return CircleAvatar(
           radius: 18,
-          backgroundColor: const Color(0xFFE0E0E0),
+          backgroundColor: Colors.grey[200],
           backgroundImage: (imgPath != null && imgPath.isNotEmpty) ? NetworkImage(imgPath) : null,
-          child: (imgPath == null || imgPath.isEmpty)
-              ? const Icon(Icons.person, size: 20, color: Colors.grey)
-              : null,
+          child: (imgPath == null || imgPath.isEmpty) ? const Icon(Icons.person, color: Colors.grey) : null,
         );
       },
     );
   }
 
-  Widget _buildCommentHeader(
-      Map<String, dynamic> data,
-      String timeAgo,
-      DateTime? updatedAt,
-      bool isMine,
-      VoidCallback onEdit,
-      VoidCallback onDelete,
-      ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
+  Widget _buildCommentHeaderFromUser(String userId, String timeAgo, DateTime? updatedAt, bool isMine, VoidCallback onEdit, VoidCallback onDelete) {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection('users').doc(userId).get(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox();
+
+        final userData = snapshot.data!.data() as Map<String, dynamic>;
+        final level = (userData['level'] ?? 0).clamp(0, 29);
+        final nickName = userData['nickName'] ?? '익명';
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(data['nickName'] ?? '익명', style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(width: 6),
-            Text('· $timeAgo', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            if (updatedAt != null)
-              const Text(' · 수정됨', style: TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-        ),
-        if (isMine)
-          PopupMenuButton<String>(
-            color: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+            Row(
+              children: [
+                Text(nickName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: levelColors[level], width: 1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Lv.$level',
+                    style: TextStyle(
+                      color: levelColors[level],
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text('· $timeAgo', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                if (updatedAt != null)
+                  const Text(' · 수정됨', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ],
             ),
-            onSelected: (value) {
-              if (value == 'edit') {
-                onEdit();
-              } else if (value == 'delete') {
-                onDelete();
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'edit', child: Text('수정')),
-              PopupMenuItem(value: 'delete', child: Text('삭제')),
-            ],
-          ),
-      ],
+            if (isMine)
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'edit') onEdit();
+                  if (value == 'delete') onDelete();
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'edit', child: Text('수정')),
+                  PopupMenuItem(value: 'delete', child: Text('삭제')),
+                ],
+              ),
+          ],
+        );
+      },
     );
   }
 
