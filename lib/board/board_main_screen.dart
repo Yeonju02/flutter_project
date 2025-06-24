@@ -27,7 +27,7 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
   final List<String> _categories = ['전체', '아침 루틴 후기/공유', '수면 관리 후기/공유', '제품/영상 추천', '공지사항'];
 
   void _handlePostMenuSelection(String value, Map<String, dynamic> post) async {
-    if (!mounted) return; // 위젯이 아직 살아있을 때만 실행
+    if (!mounted) return;
 
     if (value == 'edit') {
       Navigator.push(
@@ -110,8 +110,8 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                             ),
                           ),
                           selected: isSelected,
-                          selectedColor: const Color(0xFF92BBE2),     // 선택된 배경
-                          backgroundColor: const Color(0xFFE0E0E0),   // 선택되지 않은 배경
+                          selectedColor: const Color(0xFF92BBE2),
+                          backgroundColor: const Color(0xFFE0E0E0),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
@@ -685,7 +685,7 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
 
                                                         final userDoc = await FirebaseFirestore.instance
                                                             .collection('users')
-                                                            .doc(userId) // 좋아요 누른 사람 (현재 유저)
+                                                            .doc(userId)
                                                             .get();
 
                                                         final nickName = userDoc.data()?['nickName'] ?? '익명';

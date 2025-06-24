@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:routinelogapp/board/board_detail_screen.dart';
 
 class ReportListScreen extends StatelessWidget {
   const ReportListScreen({super.key});
@@ -7,7 +8,6 @@ class ReportListScreen extends StatelessWidget {
   Future<void> deleteBoardCompletely(String boardId) async {
     final boardRef = FirebaseFirestore.instance.collection('boards').doc(boardId);
 
-    // 하위 컬렉션 삭제 (신고 reports는 삭제 x)
     Future<void> deleteSubCollection(String subPath) async {
       final subCollection = await boardRef.collection(subPath).get();
       for (var doc in subCollection.docs) {
@@ -17,18 +17,17 @@ class ReportListScreen extends StatelessWidget {
 
     await deleteSubCollection('comments');
     await deleteSubCollection('likes');
-    // await deleteSubCollection('reports');
-
-    await boardRef.delete(); // 게시글 문서 삭제
+    await boardRef.delete();
   }
 
   Future<void> markAsResolved(String boardId, String reportId) async {
     final resolvedAt = Timestamp.now();
 
-    // 게시글만 삭제
-    await deleteBoardCompletely(boardId);
+    await FirebaseFirestore.instance
+        .collection('boards')
+        .doc(boardId)
+        .update({'isDeleted': true});
 
-    // 신고 문서 상태만 업데이트 (삭제 X)
     await FirebaseFirestore.instance
         .collection('boards')
         .doc(boardId)
@@ -43,10 +42,12 @@ class ReportListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F6F8),
       appBar: AppBar(
         title: const Text('신고', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF5F6F8),
+        elevation: 0,
+        foregroundColor: const Color(0xFF4B4B4B),
       ),
       body: FutureBuilder<QuerySnapshot>(
         future: FirebaseFirestore.instance.collection('boards').get(),
@@ -67,25 +68,7 @@ class ReportListScreen extends StatelessWidget {
                     .snapshots(),
                 builder: (context, reportSnap) {
                   if (!reportSnap.hasData) return const SizedBox();
-
-                  final now = DateTime.now();
-                  final List<QueryDocumentSnapshot> reportsToShow = [];
-
-                  for (var doc in reportSnap.data!.docs) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final isResolved = data['isResolved'] == true;
-                    final resolvedAt = data['resolvedAt'];
-
-                    // 삭제 조건: 해결된 지 24시간 지난 경우 → 삭제만 하고 continue 하지 않음
-                    if (isResolved && resolvedAt is Timestamp) {
-                      final resolvedTime = resolvedAt.toDate();
-                      if (now.difference(resolvedTime).inHours >= 24) {
-                        doc.reference.delete(); // 삭제만 수행
-                      }
-                    }
-                    reportsToShow.add(doc);
-                  }
-
+                  final reportsToShow = reportSnap.data!.docs;
                   if (reportsToShow.isEmpty) return const SizedBox();
 
                   return Column(
@@ -97,29 +80,70 @@ class ReportListScreen extends StatelessWidget {
                       final createdAtText = (createdAt is Timestamp)
                           ? createdAt.toDate().toString()
                           : '시간 없음';
+                      final boardIdFromReport = report['boardId'];
+                      final reporterId = report['reporterId'];
 
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        child: ListTile(
-                          title: Text('[${report['reason']}] ${report['boardId']}'),
-                          subtitle: Text(
-                            '신고자: ${report['reporterId']}\n시간: $createdAtText',
-                          ),
-                          trailing: isResolved
-                              ? Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(Icons.check_circle, color: Colors.green),
-                              SizedBox(height: 4),
-                              Text('해결됨', style: TextStyle(fontSize: 10, color: Colors.green)),
-                            ],
-                          )
-                              : ElevatedButton(
-                            onPressed: () => markAsResolved(boardId, reportDoc.id),
-                            child: const Text('해결'),
-                          ),
-                          isThreeLine: true,
-                        ),
+                      return FutureBuilder<DocumentSnapshot>(
+                        future: FirebaseFirestore.instance.collection('boards').doc(boardIdFromReport).get(),
+                        builder: (context, boardSnapshot) {
+                          final title = (boardSnapshot.hasData && boardSnapshot.data != null && boardSnapshot.data!.exists)
+                              ? (boardSnapshot.data!.data() as Map<String, dynamic>)['title'] ?? '제목 없음'
+                              : '제목 불러오는 중...';
+
+                          return FutureBuilder<DocumentSnapshot>(
+                            future: FirebaseFirestore.instance.collection('users').doc(reporterId).get(),
+                            builder: (context, userSnapshot) {
+                              String nick = '신고자: $reporterId (정보 없음)';
+                              if (userSnapshot.hasData &&
+                                  userSnapshot.data != null &&
+                                  userSnapshot.data!.exists) {
+                                final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+                                final userIdText = userData['userId'] ?? '알 수 없음';
+                                nick = '신고자: $userIdText';
+                              }
+
+                              return Card(
+                                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                color: const Color(0xFFF5F6F8),
+                                child: ListTile(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => BoardDetailScreen(boardId: boardIdFromReport),
+                                      ),
+                                    );
+                                  },
+                                  title: Text(
+                                    '[${report['reason']}] $title',
+                                    style: const TextStyle(color: Color(0xFF4B4B4B)),
+                                  ),
+                                  subtitle: Text(
+                                    '$nick\n시간: $createdAtText',
+                                    style: const TextStyle(color: Color(0xFF4B4B4B)),
+                                  ),
+                                  trailing: isResolved
+                                      ? Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: const [
+                                      Icon(Icons.check_circle, color: Color(0xFF4B4B4B)),
+                                      SizedBox(height: 4),
+                                      Text('삭제됨', style: TextStyle(fontSize: 10, color: Color(0xFF4B4B4B))),
+                                    ],
+                                  )
+                                      : ElevatedButton(
+                                    onPressed: () => markAsResolved(boardId, reportDoc.id),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF819CFF), // 버튼 색
+                                    ),
+                                    child: const Text('삭제', style: TextStyle(color: Colors.white),),
+                                  ),
+                                  isThreeLine: true,
+                                ),
+                              );
+                            },
+                          );
+                        },
                       );
                     }).toList(),
                   );
