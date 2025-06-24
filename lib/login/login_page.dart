@@ -113,14 +113,21 @@ class _LoginPageState extends State<LoginPage> {
             .get();
 
         if (userDoc.docs.isEmpty) {
-          await FirebaseFirestore.instance.collection('users').add({
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
             'userId': user.email!.split('@').first,
             'userEmail': user.email,
             'nickName': user.displayName ?? '사용자',
             'imgPath': user.photoURL ?? '',
             'joinedAt': Timestamp.now(),
-            'status': 'active',
-            'level': 'normal',
+            'status': 'U',
+            'level': 1,
+            'xp': 0,
+            'streakCount': 0,
+            'maxStreak': 0,
+            'deleted': false,
+            'notiEnable': true,
+            'address': '',
+            'point': 0
           });
         }
 
