@@ -452,8 +452,10 @@ class _BoardMainScreenState extends State<BoardMainScreen> {
                                           : null,
                                     ),
                                     const SizedBox(width: 8),
-                                    Text(post['nickName'] ?? '익명',
-                                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    Text(
+                                      userData['nickName'] ?? '익명',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
                                     const SizedBox(width: 8),
                                     isPostWriterAdmin && isNotice
                                         ? Container(
