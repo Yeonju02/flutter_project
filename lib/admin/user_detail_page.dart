@@ -74,7 +74,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
               decoration: InputDecoration(
                 filled: true,
                 fillColor: const Color(0xFFF7F8FA),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // 높이 줄임
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
