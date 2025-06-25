@@ -3,6 +3,8 @@
   <img src="https://github.com/user-attachments/assets/7744d0d3-74c0-425a-9b12-95ce3b8edc66" width="600"/>
 </p>
 
+---
+
 ## 💡 프로젝트 소개
 
 **루틴로그**는 사용자의 아침과 밤 루틴을 기록하고 관리하는 **습관 형성 앱**입니다.  
