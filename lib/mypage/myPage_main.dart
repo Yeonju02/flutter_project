@@ -45,6 +45,8 @@ class _MyPageMainState extends State<MyPageMain> {
   int selectedTabIndex = 0;
   late List<Widget> tabContents = [];
   int selectedDeliveryTab = 0;
+  final numberFormat = NumberFormat('#,###');
+
 
   // 유저 정보 편집(닉네임, 이메일)
   final TextEditingController nicknameController = TextEditingController();
@@ -1375,7 +1377,7 @@ class _MyPageMainState extends State<MyPageMain> {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  '관리자가 삭제한 게시글입니다.',
+                  '관리자가 삭제한 게시물입니다.',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -1670,7 +1672,7 @@ class _MyPageMainState extends State<MyPageMain> {
                 ),
               ),
               Text(
-                "${order['productPrice'] * order['quantity'] ?? '0'} 원",
+                "${numberFormat.format(order['productPrice'] ?? 0 * order['orderedQuantity'] ?? 0)} 원",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -1837,7 +1839,7 @@ class _MyPageMainState extends State<MyPageMain> {
               ),
 
               Text(
-                "${order['productPrice']*order['orderedQuantity']} 원",
+                "${numberFormat.format(order['productPrice'] ?? 0 * order['orderedQuantity'] ?? 0)} 원",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -2365,7 +2367,8 @@ class _MyPageMainState extends State<MyPageMain> {
                           ],
                         ),
                       ),
-                      Text("${order['productPrice']} 원", style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text("${numberFormat.format(order['productPrice'] ?? 0)} 원",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                     ],
                   ),
                   SizedBox(height: 20),
