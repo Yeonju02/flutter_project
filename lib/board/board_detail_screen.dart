@@ -235,10 +235,12 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                       FutureBuilder<DocumentSnapshot>(
                         future: FirebaseFirestore.instance.collection('users').doc(data['userId']).get(),
                         builder: (context, userSnapshot) {
+                          Map<String, dynamic> userData = {};
                           String? profileImg;
                           int? userLevel;
+
                           if (userSnapshot.hasData && userSnapshot.data!.exists) {
-                            final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+                            userData = userSnapshot.data!.data() as Map<String, dynamic>;
                             profileImg = userData['imgPath'];
                             userLevel = userData['level'];
                           }
@@ -273,7 +275,7 @@ class _BoardDetailScreenState extends State<BoardDetailScreen> {
                                           Row(
                                             children: [
                                               Text(
-                                                data['nickName'] ?? '익명',
+                                                userData['nickName'] ?? '익명',
                                                 style: const TextStyle(fontWeight: FontWeight.bold),
                                               ),
                                               const SizedBox(width: 6),
