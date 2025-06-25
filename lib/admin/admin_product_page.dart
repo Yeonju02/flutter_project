@@ -9,7 +9,6 @@ import 'admin_dashboard_page.dart';
 import 'admin_product_edit.dart';
 import 'admin_user_page.dart';
 
-// 기존 import 유지
 class AdminProductPage extends StatefulWidget {
   const AdminProductPage({super.key});
 

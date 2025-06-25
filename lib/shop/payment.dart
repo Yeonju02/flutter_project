@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../mypage/delivery_address.dart';
 
 class PaymentPage extends StatefulWidget {
-  final List<Map<String, dynamic>> products; // 여러 상품
+  final List<Map<String, dynamic>> products;
   const PaymentPage({super.key, required this.products});
 
   @override
@@ -18,12 +18,12 @@ class _PaymentPageState extends State<PaymentPage> {
   final formatter = NumberFormat('#,###');
   final _formKey = GlobalKey<FormState>();
 
-
-  // 배송 정보 입력값
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
   final addressController = TextEditingController();
   final requestController = TextEditingController();
+
+  final Color fieldColor = const Color(0xFFF5F7FA);
 
   int pointOwned = 0;
   int pointAvailable = 0;
@@ -100,7 +100,7 @@ class _PaymentPageState extends State<PaymentPage> {
         .get();
 
     if (userQuery.docs.isEmpty) {
-      debugPrint('❌ userId 일치하는 사용자 문서 없음');
+      debugPrint('userId 일치하는 사용자 문서 없음');
       return;
     }
 
@@ -116,7 +116,6 @@ class _PaymentPageState extends State<PaymentPage> {
 
     if (addressSnapshot.docs.isNotEmpty) {
       final data = addressSnapshot.docs.first.data();
-      debugPrint("✅ 기본 배송지 불러오기 성공: ${data['address']}");
       setState(() {
         nameController.text = data['name'] ?? '';
         phoneController.text = data['phone'] ?? '';
@@ -124,7 +123,7 @@ class _PaymentPageState extends State<PaymentPage> {
         requestController.text = data['request'] ?? '';
       });
     } else {
-      debugPrint('⚠️ 기본 배송지 없음');
+      debugPrint('기본 배송지 없음');
     }
   }
 
@@ -148,7 +147,7 @@ class _PaymentPageState extends State<PaymentPage> {
     }
 
     final discount = (pointUsed >= 500 && pointUsed % 10 == 0 && pointUsed <= pointAvailable) ? pointUsed : 0;
-    final fee = (sum - discount) >= 50000 ? 0 : 50;
+    final fee = (sum - discount) >= 50000 ? 0 : 3000;
 
     setState(() {
       productTotal = sum;        // 총 상품 금액
@@ -165,7 +164,7 @@ class _PaymentPageState extends State<PaymentPage> {
     final userId = prefs.getString('userId');
 
     if (userId == null) {
-      print('❌ SharedPreferences에서 userId 없음');
+      print('userId 없음');
       return;
     }
 
@@ -176,7 +175,7 @@ class _PaymentPageState extends State<PaymentPage> {
         .get();
 
     if (query.docs.isEmpty) {
-      print('❌ userId가 "$userId"인 문서를 찾을 수 없습니다.');
+      print('userId가 "$userId"인 문서를 찾을 수 없음.');
       return;
     }
 
@@ -190,8 +189,8 @@ class _PaymentPageState extends State<PaymentPage> {
       final usable = (rawPoint ~/ 10) * 10;
       pointAvailable = usable >= 500 ? usable : 0;
 
-      userEmail = data['userEmail'] ?? ''; // ✅ 이메일 저장
-      pointController.text = '0'; // 초기화
+      userEmail = data['userEmail'] ?? '';
+      pointController.text = '0';
     });
   }
 
@@ -204,7 +203,6 @@ class _PaymentPageState extends State<PaymentPage> {
     super.dispose();
   }
 
-  // UI
   @override
   Widget build(BuildContext context) {
     int getTotalQuantity() {
@@ -264,22 +262,24 @@ class _PaymentPageState extends State<PaymentPage> {
               const Divider(height: 20),
 
               // 배송 정보 입력
-              const Text('배송 정보', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () async {
-                    // 배송지 관리로 이동
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => DeliveryAddressPage()),
-                    );
-
-                    // 돌아왔을 때 최신 기본 배송지 다시 로딩
-                    await _loadDefaultAddress();
-                  },
-                  child: const Text('배송지 관리'),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '배송 정보',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => DeliveryAddressPage()),
+                      );
+                      await _loadDefaultAddress(); // 돌아오면 다시 로딩
+                    },
+                    child: const Text('배송지 관리'),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               _buildTextField(nameController, '이름', '받는 분 이름을 입력하세요'),
@@ -294,12 +294,21 @@ class _PaymentPageState extends State<PaymentPage> {
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: pointController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        hintText: '사용할 포인트 입력',
-                        border: OutlineInputBorder(),
+                    child: SizedBox(
+                      height: 50,
+                      child: TextField(
+                        controller: pointController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: '사용할 포인트 입력',
+                          filled: true,
+                          fillColor: const Color(0xFFF5F7FA),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -401,7 +410,13 @@ class _PaymentPageState extends State<PaymentPage> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          border: const OutlineInputBorder(),
+          filled: true,
+          fillColor: const Color(0xFFF5F7FA),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
         ),
         validator: optional ? null : (value) => value == null || value.isEmpty ? '$label을 입력하세요' : null,
       ),
@@ -410,18 +425,9 @@ class _PaymentPageState extends State<PaymentPage> {
 
   void _onPayPressed() async {
     if (_formKey.currentState!.validate()) {
-      // 여기에 KG이니시스 연동 또는 결제 페이지 이동 로직을 작성
-      print('주문 정보:');
-      print('이름: ${nameController.text}');
-      print('전화번호: ${phoneController.text}');
-      print('주소: ${addressController.text}');
-      print('요청사항: ${requestController.text}');
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("결제 진행 중...")),
       );
-
-      // TODO: KG이니시스 웹뷰 결제창 열기 또는 서버 연동
     }
 
     if (pointUsed > pointAvailable) {
@@ -441,10 +447,6 @@ class _PaymentPageState extends State<PaymentPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('usedPoint', pointUsed);
 
-    for (var product in widget.products) {
-      print("🔥 주문 상품: $product");
-    }
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -459,7 +461,6 @@ class _PaymentPageState extends State<PaymentPage> {
         ),
       ),
     );
-
 
   }
 }
