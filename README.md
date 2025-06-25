@@ -1,4 +1,7 @@
-# ![image](https://github.com/user-attachments/assets/0ae8c7d9-5933-41ea-89ee-d5578752f4d8) 루틴로그 - 아침 & 밤 루틴 설계 및 관리
+# 📝 루틴로그 - 아침 & 밤 루틴 설계 및 관리
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/7744d0d3-74c0-425a-9b12-95ce3b8edc66" width="600"/>
+</p>
 
 ## 💡 프로젝트 소개
 
