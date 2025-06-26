@@ -34,7 +34,7 @@
 
 ---
 
-## 🛠 기술 스택
+## 🛠 사용 기술
 
 ![Flutter](https://img.shields.io/badge/Flutter-3.x-blue?logo=flutter) | ![Dart](https://img.shields.io/badge/Dart-3.x-blue?logo=dart) | ![Firebase](https://img.shields.io/badge/Firebase%20Firestore-NoSQL-yellow?logo=firebase) | ![Google Login](https://img.shields.io/badge/Google%20Login-blue?logo=google)| ![Firebase Auth](https://img.shields.io/badge/Firebase%20Auth-green?logo=firebase) ![Firebase Storage](https://img.shields.io/badge/Firebase%20Storage-orange?logo=firebase)
 
@@ -42,25 +42,25 @@
 
 ## 📱 주요 기능
 
-👤 사용자 기능
-- 루틴 관리: 아침/밤 루틴 설정 및 완료 기록, XP 획득
+### 👤 사용자 기능
+- 루틴 관리 : 아침/밤 루틴 설정 및 완료 기록, XP 획득
 
-- 수면 사이클: 기상 시간 맞춤형 수면 시간 제공
+- 수면 사이클 : 기상 시간 맞춤형 수면 시간 제공
 
-- 쇼핑몰: 상품 조회, 리뷰, 장바구니, 결제(KG이니시스 연동)
+- 쇼핑몰 : 상품 조회, 리뷰, 장바구니, 결제(KG이니시스 연동)
 
-- 커뮤니티: 게시글/댓글/좋아요, 알림
+- 커뮤니티 : 게시글/댓글/좋아요, 알림
 
-- 마이페이지: 정보 수정, 주문/배송 조회, 리뷰 작성, 알림 설정
+- 마이페이지 : 정보 수정, 주문/배송 조회, 리뷰 작성, 알림 설정
 
-🛠️ 관리자 기능
-- 회원 관리: 사용자 리스트, 상세 정보 확인
+### 🛠️ 관리자 기능
+- 회원 관리 : 사용자 리스트, 상세 정보 확인
 
-- 상품 관리: 굿즈 등록/수정/삭제
+- 상품 관리 : 굿즈 등록/수정/삭제
 
-- 게시글 관리: 게시판/댓글 신고 처리
+- 게시글 관리 : 게시판/댓글 신고 처리
 
-- 통계 대시보드: 월별 매출, 가입자 수 시각화
+- 통계 대시보드 : 월별 매출, 가입자 수 시각화
 
 ---
 
