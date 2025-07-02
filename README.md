@@ -79,6 +79,7 @@
 
 | 분류 | 링크 |
 |------|------|
+| 📊 PPT | [루틴로그 PPT](https://drive.google.com/file/d/1lvBCMZomvPlwMdoVm4Nhgr-jayi95mpL/view?usp=sharing)
 | 🎨 피그마 | [모든 거 여기서 작업](https://www.figma.com/file/example) |
 | 📁 구글 공유 문서 | [링크 바로가기](https://drive.google.com/drive/folders/1qER8y17_Hqc0VLBOQrmFhK0u1yCShDEP) |
 | 🧑‍💻 GitHub | [프로젝트 저장소](https://github.com/Yeonju02/flutter_project) |
